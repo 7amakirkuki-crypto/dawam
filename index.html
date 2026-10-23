@@ -119,6 +119,13 @@ section.month{margin-top:30px}
 .field label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
 .field input[type=number],.field input[type=text]{width:100%;min-height:50px;border-radius:14px;border:1.5px solid var(--line);
   background:var(--bg);color:var(--ink);font:inherit;font-size:1.1rem;padding:0 14px}
+.memo{margin:18px 0 0}
+.memo label{display:block;font-size:.9rem;font-weight:600;margin-bottom:6px}
+textarea{display:block;width:100%;min-height:84px;border-radius:14px;border:1.5px solid var(--line);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:1rem;padding:10px 14px;resize:vertical}
+.sheet textarea{background:var(--bg)}
+textarea:focus-visible{outline:3px solid var(--rose);outline-offset:2px}
+.day.noted::after{content:"";position:absolute;top:5px;left:5px;width:6px;height:6px;border-radius:50%;background:var(--gold)}
 .toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line)}
 .toggle input{width:22px;height:22px;accent-color:var(--rose)}
 .small-msg{font-size:.85rem;color:var(--muted);margin:6px 0 0}
@@ -173,6 +180,11 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
     <span class="from" id="noteFrom"></span>
   </div>
 
+  <div class="memo">
+    <label for="memo">ملاحظاتي لليوم</label>
+    <textarea id="memo" rows="3" placeholder="اكتبي أي شي تريدين تتذكرينه…"></textarea>
+  </div>
+
   <section class="month">
     <div class="mhead">
       <h2 id="mTitle"></h2>
@@ -201,7 +213,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
 <div class="scrim" id="startSheet" role="dialog" aria-modal="true" aria-labelledby="stT">
   <div class="sheet">
     <h3 id="stT">شكد ساعات دوامج اليوم؟</h3>
-    <p class="hint">غيّريها بزر + و − إذا اليوم مختلف.</p>
+    <p class="hint" id="stHint">غيّريها بزر + و − إذا اليوم مختلف.</p>
     <div class="stepper">
       <button type="button" id="stPlus" aria-label="زيادة نص ساعة">+</button>
       <div class="val"><b id="stVal">5:00</b><span>ساعة</span></div>
@@ -261,6 +273,8 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
       <div class="field"><label for="oH">ساعات</label><input id="oH" type="number" min="0" max="16" inputmode="numeric"></div>
       <div class="field"><label for="oM">دقايق</label><input id="oM" type="number" min="0" max="59" inputmode="numeric"></div>
     </div>
+    <p class="sec">ملاحظات</p>
+    <textarea id="eNote" rows="3" style="margin-bottom:14px"></textarea>
     <div class="actions">
       <button class="btn primary" id="eSave">حفظ</button>
       <button class="btn ghost" id="eDel">مسح اليوم</button>
@@ -277,7 +291,15 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
       <div class="field"><label for="sName">اسمج</label><input id="sName" type="text" autocomplete="off" placeholder="شوشه"></div>
       <div class="field" style="flex:.6"><label for="sReg">ساعات الدوام المعتادة</label><input id="sReg" type="number" min="1" max="12" step="0.5" inputmode="decimal"></div>
     </div>
+    <p class="sec">وقت حساب الدوام</p>
+    <div class="row">
+      <div class="field"><label for="sWinS">من الساعة</label><input id="sWinS" type="number" min="0" max="23" inputmode="numeric"></div>
+      <div class="field"><label for="sWinE">لحد الساعة</label><input id="sWinE" type="number" min="1" max="24" inputmode="numeric"></div>
+    </div>
+    <p class="small-msg" style="margin:-8px 0 12px">برا هالوقت ما ينحسب شي، وإذا نسيتي تضغطين خلصت الدوام، ينسد اليوم وحده بنهاية الوقت.</p>
     <label class="toggle"><span>خلي الشاشة شغالة وقت الدوام</span><input type="checkbox" id="sWake"></label>
+    <div class="field" style="padding-top:12px;border-top:1px solid var(--line)"><label for="sSync">رمز المزامنة (نفس الرمز بكل جهاز)</label><input id="sSync" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr"></div>
+    <p class="small-msg" id="syncState"></p>
     <button class="btn primary" style="width:100%;margin-top:14px" id="sSave">حفظ</button>
   </div>
 </div>
@@ -342,11 +364,54 @@ const MSG = {
 /* ===== Pool of general messages, shown in turn ===== */
 const POOL = ["فخور بيج أكثر مما تتصورين يا شوشه", "انتي أقوى من أي يوم صعب", "كل ما أتذكرج أبتسم بدون سبب", "تعبج اليوم راحة باجر، والله يجزيج خير", "ابتسامتج تكفي تنور الدنيا كلها", "شوشه، انتي أحلى شي صار بحياتي", "لا تنسين تشربين ماي يا حلوة", "الله يحفظج بكل خطوة تخطينها", "أي شي تسوينه بحب يطلع حلو، وانتي تسوين كلشي بحب", "أحبج اليوم أكثر من البارحة، وأقل من باجر", "ترا محد يشتغل بإخلاص مثلج", "لو تعرفين شكد أفتخر بيج كدام الناس", "انتي مو بس مرتي، انتي صديقتي وسندي", "كل دقيقة تتعبين بيها محسوبة عند الله وعندي", "قلبي وياج طول الدوام", "تذكري: البيت ما يصير بيت بدونج", "شوشه، انتي البطلة بكل القصص", "يومج يستاهل يكون حلو مثلج", "خذي نفس عميق، وكملي، انتي قدها وقدود", "إذا ضايقج أحد، تذكري إن أكو واحد يشوفج أحلى إنسانة", "أنا محظوظ بيج كل يوم", "كل ساعة تمر تقربج للبيت ولي", "ما أحد يعرف شكد انتي تعبانة غيري، وأنا ممنون إلج", "انتي مثل الشمس، تطلعين حتى بالأيام الغيمة", "شوشه، الله يوفقج بكل شي تريدينه", "لا تخلين أي شي يطفي ضحكتج", "تعبج ما يروح هدر، أبداً", "أنتظرج على أحر من الجمر", "انتي سبب كل شي حلو بيومي", "ثقي بنفسج مثل ما أنا واثق بيج", "الشغل ينتهي، بس حبي إلج ما ينتهي", "شوشه، انتي تستاهلين أحلى عالم", "كل يوم أتعلم منج الصبر", "لو كان الدوام سباق، انتي أول وحدة", "ريحي بالج، كلشي راح يمشي زين", "انتي أحن قلب عرفته", "خلي الضحكة على وجهج، تلبقلج", "الله يكتبلج الخير وين ما تكونين", "أحب طريقتج بالتفكير", "انتي مرتبة وذكية وحلوة، شنو بعد؟", "كل التعب يهون من أشوفج راجعة", "شوشه، انتي نعمة من الله", "لا تنسين إنج إنسانة مميزة", "يا ريت أكدر أشيل عنج التعب", "عيونج تحجي قصص حلوة", "دعيتلج اليوم من كل قلبي", "مهما كان اليوم طويل، آخره لقاء", "انتي سري الحلو", "ما في يوم أندم إني اخترتج", "خليها ببالج: أنا وراج بكل شي", "شوشه، انتي تخلين الصعب سهل", "أحب صوتج من تحجين عن يومج", "انتي أحلى صدفة وأحلى قرار", "ترا الدنيا أحلى لأن بيها انتي", "كل شي تلمسينه يصير أرتب وأحلى", "أنا أصدق المعجبين بيج", "انتي تعطين بدون حساب، والله يعطيج", "شوشه، صبرج بطولة", "لا تضغطين على نفسج، سوي اللي تكدرين", "روحج حلوة وتوصل للكل", "أحس بالأمان من أفكر بيج", "انتي ضوء البيت", "تكدرين على كلشي، بس لا تنسين نفسج", "وجودج بحياتي هدية ما أستاهلها", "يومج راح يخلص على خير، إن شاء الله", "انتي إنسانة نادرة", "من تبتسمين، اليوم كله يتغير", "شوشه، خليج قوية مثل ما عهدتج", "أحبج بكل اللغات", "ما في شي يقدر يكسر عزيمتج", "لو تعبتي، اسندي راسج على فكرة إني أحبج", "الله يبعد عنج كل ضيق", "انتي تستاهلين كل الراحة بالعالم", "مشتاقلج، ولسه ما مر هواية", "تذكري إن كل يوم يمر هو خطوة لأحلامنا", "شوشه، انتي أحلى من كل الروايات", "ترا أنا أحسب الساعات وياج", "انتي المكافأة الحلوة لكل يوم طويل", "خليج مبتسمة، الدنيا تستاهل", "أنا ممتن لكل شي تسوينه", "انتي قلب البيت ونبضه", "بيج يصير الروتين حلو", "الله يقويج ويسعدج", "انتي مثال للمرأة القوية الحنونة", "شوشه، الزين يبقى زين", "كل ما تتعبين أحبج أكثر", "ترا ما في أحلى منج بهالدنيا", "خلي التعب على صفحة، والضحكة على صفحة أكبر", "عندج طاقة تكفي مدينة", "أحب إنج تهتمين بكل التفاصيل", "انتي تخلين الناس يرتاحون حواليج", "شوشه، الله يرزقج راحة البال", "اشتغلي بهدوء، ما في شي يستاهل تتوترين عليه", "انتي غالية، وما في شي يغلى عليج", "أحبج حتى من تكونين عصبية", "تعرفين شنو أحلى شي؟ إنج مالتي", "أنا وياج حتى لو بعيد", "خلي قلبج مرتاح", "شوشه، انتي حكاية حلوة ما أمل منها", "الدنيا تحلى بوجودج", "الله يحفظج من كل شر", "انتي تستاهلين كل الحلو", "أفكر بيج وأبتسم مثل الأطفال", "انتي تعطين للتعب معنى", "كلي فخر إنج شريكة عمري", "لا تخلين أحد يقلل من قيمتج", "انتي ملكة بكل مكان تدخلينه", "أحبج يا أطيب قلب", "بعدج قوية، وبعدج حلوة", "شوشه، يومج إلج، وأنا إلج", "تذكري تاكلين شي حلو اليوم", "ترا الشغل يحتاجج، بس آني أحتاجج أكثر", "كل يوم تعلميني شي جديد عن الحب", "انتي سر سعادتي", "الله يكملج بعقلج", "خليها ببالج: ماكو مستحيل وياج", "إذا اليوم ثقيل، باجر أخف", "انتي تستاهلين وردة كل يوم", "شوشه، انتي فرحتي", "مثل فنجان قهوة بيوم بارد، انتي تدفين قلبي", "يوم عادي، بس وياج يصير قصة", "لو كانت حياتي رواية، انتي أحلى فصل بيها", "أحبج مثل ما يحب القارئ صفحته الأخيرة، ما يريدها تخلص", "شوشه، صوتج أحلى من أي أغنية جاز", "مثل المطر الهادئ، وجودج يريح الروح", "بيج أفهم ليش الناس يكتبون روايات حب", "انتي القمر اللي ينور ليلي", "تخيلي إحنا ثنين بمقهى صغير، قهوة وكتاب وضحك", "كل الطرق تودي لابتسامتج", "لو يصير الوقت يوقف، أخليه يوقف بلحظة ضحكتج", "انتي اللحن اللي ما أمل أسمعه", "مثل قطة تلقى مكان دافي بالشمس، أنا لقيتج", "شوشه، انتي الصفحة اللي أعلم عليها حتى أرجعلها", "يمكن العالم غريب أحياناً، بس وياج كلشي مفهوم", "بين كل الوجوه، وجهج هو البيت", "أحب الهدوء اللي يجي وياج", "انتي الجملة الحلوة بآخر اليوم", "مثل نغمة بيانو بليل هادئ، انتي", "الدنيا رواية طويلة، وانتي بطلتها", "كل شي بسيط وياج يصير ساحر", "شوشه، انتي سبب إني أحب الصباحات", "تخيلي البيت هسه، ساكت يستناج", "مثل كتاب حلو، كل ما أقراج ألكى شي جديد", "انتي الضوء الدافي بغرفة باردة", "كل يوم معاج فصل جديد", "أحبج بهدوء، وبعمق، وبدون نهاية", "شوشه، حتى الغيوم تبتسم من تمرين", "انتي القصة اللي أحب أحكيها لنفسي", "مثل البحر، ما ينعرف شكد عميق حبي إلج", "لو جان القلب مكتبة، انتي كل الرفوف", "تمشين وياج الشمس", "كل لحظة وياج تستاهل تنكتب", "انتي الشي الحقيقي بعالم مليان أشياء مو حقيقية", "ريحة القهوة تذكرني بيج", "شوشه، انتي موسيقى بيومي", "مثل نجمة صغيرة، تنورين بدون ما تحسين", "يمكن ما أعرف أكتب شعر، بس أعرف أحبج", "انتي الهدوء بعد العاصفة", "كل الروايات الحلوة بيها وحدة مثلج", "أحب حتى صمتج", "مثل مطر الربيع، تجين وتخلين كلشي يخضر", "انتي سري اللي ما أحكيه لأحد", "شوشه، حتى الساعة تتمنى تمشي أبطأ وياج", "القلب يدق على إيقاعج", "انتي النافذة اللي أشوف منها الدنيا أحلى", "تخيلي نزهة صغيرة بآخر الأسبوع، بس إحنا", "مثل شمعة، تنورين حتى لو تعبانة", "كل يوم أحبج بطريقة جديدة", "انتي الغيمة الحلوة اللي تظلل يومي", "شوشه، انتي حلمي اللي صار حقيقة", "بيج الوقت له طعم", "انتي ابتسامة القدر إلي", "مثل رسالة قديمة محفوظة، حبج غالي", "كل التفاصيل الصغيرة وياج كبيرة", "انتي الأغنية اللي أدندنها بدون ما أنتبه", "شوشه، الدنيا ثقيلة، بس انتي خفيفة على القلب", "حتى القطط تحسدني عليج", "انتي الرواية اللي ما أريد أخلصها", "مثل الفجر، دايماً تجين بأمل جديد", "أحبج مثل ما الأرض تحب المطر", "انتي سكوني وصخبي", "شوشه، يومج كتاب حلو، كملي قراءته", "مثل نسمة بالصيف، تريحين كل من حواليج", "انتي السبب اللي يخليني أكمل", "كل الكلمات قليلة عليج", "انتي الكوب الدافي بإيد باردة", "تخيلي إحنا كبار، وبعدنا نضحك سوا", "شوشه، انتي أحلى صدفة بالكون", "مثل ضوء القمر على المي، هادئة وحلوة", "أحب كيف تشوفين الدنيا", "انتي الحكاية اللي تخلي الليل قصير", "كل يوم وياج مغامرة صغيرة", "مثل ورقة شجر بالخريف، ألوانج كلها حلوة", "انتي حلاوة الأيام العادية", "شوشه، انتي طمأنينتي", "لو يسألوني عن السعادة، أشير عليج", "انتي السطر اللي أحب أعيد قراءته", "مثل الموسيقى الهادية، تريحين أعصابي", "كلشي يصير أحلى من تحجين عنه", "انتي الشروق بعد ليل طويل", "شوشه، الدنيا تضيق وقلبج يوسع", "مثل البيت القديم، دافي ومليان ذكريات", "انتي أجمل فكرة بعقلي", "تعالي نخطط لسفرة صغيرة، بس إحنا والكتب", "انتي الوعد اللي ما ينكسر", "مثل زهرة بين الحجر، قوية وحلوة", "شوشه، انتي فصل الربيع بحياتي", "كل شي يرجع لمكانه من تبتسمين", "انتي البوصلة اللي ترجعني للطريق", "مثل فلم حلو، ما أريده يخلص", "أحب أحجيلج عن يومي، وأحب أسمع يومج أكثر", "انتي الفرحة اللي ما تحتاج سبب", "شوشه، انتي قطعة من الجنة", "مثل الشاي بعد يوم طويل، انتي الراحة", "انتي نور عيوني", "كل مرة أشوفج كأنها أول مرة", "انتي الطريق اللي يرجعني للبيت", "مثل غيمة بيضة بسماء زرقة، صافية وحلوة", "شوشه، انتي فرح بسيط وعميق", "أحبج بطريقة ما ينكتب عنها", "انتي البداية الحلوة لكل شي", "مثل أول قطرة مطر، تفرحين القلب", "انتي السلام اللي أدور عليه", "شوشه، العالم أهدأ وانتي بيه", "شوشه، لو اليوم صعب، تذكري إنج عديتي أصعب", "كل خطوة صغيرة اليوم هي إنجاز", "لا تقارنين نفسج بأحد، انتي بسباقج الخاص", "التعب يمشي، بس الإنجاز يبقى", "إذا غلطتي بشي، عادي، كلنا نغلط", "انتي تكبرين كل يوم، حتى لو ما تحسين", "صبرج اليوم يفتح أبواب باجر", "خطوة خطوة، وتوصلين", "شوشه، ما في شي تخافين منه وأنا وياج", "ركزي على الشي اللي تكدرين عليه، والباقي على الله", "كل يوم فرصة جديدة تبينين بيها شكد انتي رائعة", "الضغط يصنع الألماس، وانتي ألماسة", "لا تستعجلين، كل شي بوقته حلو", "شوشه، انتي تسوين أكثر مما تتصورين", "خلي ثقتج بنفسج عالية", "حتى الجبال تبدأ بحجارة صغيرة", "اليوم مجرد يوم، وانتي أكبر منه", "إذا حسيتي بتعب، خذي دقيقة لنفسج", "شوشه، كل شي صعب يصير سهل مع التكرار", "انتي مبدعة بشغلج", "الناس تتعلم منج حتى لو ما يكولون", "لا تشيلين هم شي ما صار بعد", "اللي يتعب اليوم يرتاح باجر", "شوشه، نجاحج يفرحني أكثر من نجاحي", "كل مشكلة إلها حل، وانتي أذكى من المشاكل", "خليج هادئة، الهدوء قوة", "انتي تعرفين شنو تسوين، ثقي بنفسج", "حتى الأيام الثقيلة تنتهي", "شوشه، كل ساعة تشتغلينها بناء لمستقبلنا", "لا تخلين تعليق سلبي يخرب يومج", "انتي أشطر مما يظنون", "الإصرار بعيونج يخوف التعب", "شوشه، اليوم راح يمر وتضحكين عليه", "كل يوم تثبتين إنج قوية", "لا تنسين تكافئين نفسج بشي حلو", "انتي قدوة بدون ما تقصدين", "الصبر مفتاح، وانتي عندج المفتاح", "شوشه، انتي تعرفين تقلبين الصعب لحلو", "خلي التفاؤل رفيقج اليوم", "كل تحدي يكشف شكد انتي قوية", "ما في شي اسمه فشل، بس تجارب", "شوشه، لا تخلين أحد يطفي حماسج", "انتي تتحسنين كل يوم، وأنا أشوف هذا", "الأيام الحلوة جاية، أكيد", "خلي نيتج صافية والباقي يجي", "شوشه، انتي تستاهلين كل نجاح", "تذكري ليش بديتي، وكملي", "انتي محاربة بهدوء", "لا تحملين نفسج فوق طاقتها", "كل يوم ينطيج درس، وانتي تلميذة شاطرة", "شوشه، الطموح يلبقلج", "انتي تكدرين توصلين لأي مكان تريدينه", "لو اليوم ما كان مثالي، مو مشكلة", "الأشياء الحلوة تحتاج وقت", "شوشه، تعبج اليوم ورد باجر", "انتي أذكى وحدة أعرفها", "خلي عيونج على الهدف", "حتى الشمس تحتاج وقت حتى تطلع", "شوشه، كل يوم تنجحين بشي صغير، وهذا كبير", "الثبات أهم من السرعة", "انتي ثابتة مثل الجبل وحنونة مثل النسمة", "لا تستسلمين للتعب، استريحي بس", "شوشه، الله ما يضيع تعبج", "انتي تعرفين قيمتج، خليها ببالج", "كل يوم أصعب يعني نسخة أقوى منج", "الهدوء والصبر يحلون كل شي", "شوشه، ابتسمي حتى للمشاكل، تخاف منج", "انتي أكبر من أي ضغط", "كل مرة تعدين يوم صعب، تكبرين", "شوشه، أنا أؤمن بيج", "خلي يومج بسيط، والبساطة جمال", "انتي تخلقين الفرص", "لا تشيلين هم كلام الناس", "شوشه، انتي بالطريق الصح", "كل شي تتعلمينه اليوم ينفعج باجر", "انتي تستاهلين تفتخرين بنفسج", "الراحة جزء من الشغل، لا تنسينها", "شوشه، الأيام تشهد على تعبج", "خلي قلبج قوي وروحج خفيفة", "انتي تعرفين تمشين بين الصعوبات بأناقة", "كل يوم إلج بيه نصيب حلو", "شوشه، كملي، النهاية حلوة", "لا تحكمين على نفسج بقسوة", "انتي إنسانة تستاهل الاحترام بكل مكان", "خلي أحلامج قريبة من قلبج", "شوشه، انتي تقدرين، وأكثر", "كل شي يصير بوقته، اصبري", "انتي تحولين التعب لقصة نجاح", "لا تخافين من البدايات الجديدة", "شوشه، الشجاعة بيج طبيعية", "خلي إيمانج بنفسج أكبر من خوفج", "انتي ما تحتاجين تثبتين شي لأحد", "كل يوم تكبر أحلامنا سوا", "شوشه، انتي تستاهلين الأفضل دايماً", "خلي ضميرج مرتاح، هذا يكفي", "انتي شمعة ما تنطفي", "شوشه، القوة بيج مو بالعضلات، بالقلب", "كل شي راح يكون زين، وعد", "انتي إنسانة ملهمة", "خلي التعب يعلمج، مو يكسرج", "شوشه، النجاح يحبج مثل ما أحبج", "انتي تعرفين تبدين من جديد", "كل يوم هو صفحة بيضة، اكتبي بيها شي حلو", "شوشه، الله وياج وأنا وياج", "شوشه، تعرفين إنج أحلى من البارحة؟", "ترا أنا جوعان، بس مشتاقلج أكثر", "لو كان الشوق يتوزن، جان كسرت الميزان", "أخاف يجي يوم ما أشوف ضحكتج، فخليها دايماً", "شوشه، اليوم بيه شي ناقص، هو انتي", "لو أكدر، جان دزيتلج ورد على الدوام", "البيت يسألني وينها، كلتله بالدوام", "حتى الشاي ما يطلع طيب بدونج", "شوشه، شنو رأيج نطلب أكل حلو اليوم؟", "تخيلي، باقي شوية وتشوفين وجهي الحلو", "أنا هسه أفكر شنو أسويلج مفاجأة", "شوشه، قلبي يدق مثل الساعة، ينتظرج", "أحبج حتى لو أكلتي آخر قطعة حلو", "لو تعرفين شكد أحجي عليج بالخير", "شوشه، انتي مشهورة بقلبي", "حتى المكيف يشتاقلج", "ترا أنا أحسن زوج، بس لأن عندي أحسن مرة", "شوشه، لو الحب وظيفة، جان انتي المديرة", "أحبج أكثر من القهوة، وهذا اعتراف كبير", "اليوم بدونج طويل، بس أعرف إنه يستاهل", "شوشه، أتمنى يومج يمر أسرع من مسلسل حلو", "تعالي بسرعة، عندي سوالف هواية", "أحب من تضحكين على نكتي البايخة", "شوشه، انتي الوحيدة اللي تفهمني بدون كلام", "أنا مو بعيد، أنا بقلبج", "حتى من تكونين تعبانة، تبقين أحلى وحدة", "شوشه، باجر نسوي شي حلو سوا", "أحبج وأحب كل شي تحبينه", "شوشه، شكد محظوظة الشغلة اللي بيها انتي", "انتي الشخص اللي أحب أرجعله", "ترا آني فخور بيج كدام كل العالم", "شوشه، أحسج وياي حتى لو بعيدة", "شي واحد أكيد بهالدنيا: إني أحبج", "انتي تعرفين تخليني أضحك حتى بأصعب يوم", "شوشه، حضرتلج دعاء خاص اليوم", "أنا هنا، وانتي هناك، وقلوبنا سوا", "خلي بالج من نفسج، لأنج مالتي", "شوشه، خلي الساعة تمشي وانتي تبتسمين", "أحب من تحجين عن شغلج بحماس", "انتي تخلين أي يوم عادي يصير مميز", "شوشه، أنتظر صوتج", "لو أكدر أحضنج هسه، جان سويتها", "تذكري إنج عزيزة على ناس هواية", "شوشه، انتي ما تتعوضين", "أحبج حب ما ينحسب بالساعات", "ترا كل رسالة من هاي فيها حتة من قلبي", "شوشه، شكراً لأنج انتي", "انتي تستاهلين يوم مليان أشياء حلوة", "خلي الكوب مليان، والقلب أكثر", "شوشه، اليوم راح يكون حلو، بس لأنج بيه", "أحبج من قلب، وأعرف إنج تعرفين", "انتي الحب اللي ما يتكرر", "شوشه، ترا أنا سعيد لأنج بحياتي", "لو كل الناس مثلج، جان الدنيا جنة", "انتي ما تحتاجين تتعبين حتى تكونين غالية", "شوشه، أنتظرج بفارغ الصبر", "أحب كل شي بيج، حتى تفاصيلج الغريبة", "انتي تعرفين تحولين أي مكان لبيت", "شوشه، خلينا نضحك هواية الليلة", "قلبي يرسلج سلام", "انتي أحلى شي بيومي، كل يوم", "شوشه، دعواتي تحرسج", "أحبج اليوم، وباجر، ولآخر العمر", "انتي مو بس مهمة، انتي الأهم", "شوشه، يا رب يومج يكون خفيف", "حتى الغيمة تمر وتسلم عليج", "انتي القلب الطيب اللي يحتاجه العالم", "شوشه، أحبج بزاف، وبكل اللهجات", "شكراً على كل شي تسوينه بصمت", "انتي الوحيدة اللي تخلين التعب حلو", "شوشه، الدنيا ما تسوى بدونج", "أحبج حتى بأيامي الصعبة", "انتي سبب ابتسامتي هسه", "شوشه، لا تشيلين هم، أنا موجود", "خلي بالج إن أكو واحد يحسب الدقايق", "انتي الحب اللي ما يحتاج تفسير", "شوشه، يا أطيب من الطيب", "أحب من ترجعين وتحجين بسرعة عن يومج", "انتي تستاهلين مساج وكيكة وقهوة", "شوشه، تعالي نسوي عشا سوا الليلة", "أحبج لأنج انتي، بس هيچ", "انتي الضحكة اللي ما أمل منها", "شوشه، الله يخليج إلي", "خلي يومج يمر بسلام وسكينة", "انتي تخلين كلشي ممكن", "شوشه، قلبي وياج حتى من أكون ساكت", "أحبج وما أعرف أعبر مثل ما أريد", "انتي بحر من الحنان", "شوشه، ريحي بالج وكملي يومج", "كل الحب إلج، وكل الدعاء", "انتي الرفيقة اللي ما تتعوض", "شوشه، يومج أحلى بضحكتج", "أحبج أكثر من كل الكلام اللي بهالتطبيق", "انتي نجمة يومي", "شوشه، باقي شوية وأشوفج", "خلي قلبج مطمئن، كلشي بخير", "انتي حلوة من جوه ومن بره", "شوشه، أحبج، وهاي الرسالة بس حتى أذكرج", "انتي الشي الوحيد اللي ما أتخيل حياتي بدونه", "شوشه، الله يسعدج مثل ما تسعديني", "شوشه، كل يوم وياج عيد صغير", "انتي الدفا بالشتا والنسمة بالصيف", "أحب إنج تخلين الناس يحسون إنهم مهمين", "شوشه، تعبج تاج على راسي", "لو الدنيا تزعلج، أنا أراضيج", "انتي سبب إني أؤمن بالحظ الحلو", "شوشه، ما أحتاج سبب حتى أشتاقلج", "خلي اليوم يمر، وخلي ابتسامتج تبقى", "انتي اللي تعرفين تسعدين الكل", "شوشه، أحبج بقلب كامل مو نص", "كل شي بيج يستاهل يتحب", "انتي القوة الهادئة", "شوشه، الله يعطيج على قد نيتج الحلوة", "خلي روحج حرة حتى بوسط الشغل", "انتي الأمان اللي أرجعله", "شوشه، كل مرة أتذكرج أحمد الله", "لو الصبر بنت، جان انتي", "انتي تخلين البعيد قريب", "شوشه، أحبج ومرتاح لأنج بحياتي", "خلي يومج مثل قلبج، أبيض", "انتي أجمل شي شافته عيوني", "شوشه، الطيبة تلبقلج", "كل شي يهون وياج", "انتي الكتف اللي أتكي عليه", "شوشه، أحبج حب يكفي العمر", "خلي بالج: انتي غالية جداً", "انتي تعرفين تسوين من الحزن فرح", "شوشه، يا بعد عمري", "تخيلي الليلة: هدوء، وبطانية، وفلم حلو", "انتي الشي الحلو اللي صار بدون ما أخطط", "شوشه، ريحي عيونج ثواني، وكملي", "لو كل يوم أكتبلج، ما أخلص الكلام", "انتي تستاهلين عالم كامل يحتفل بيج", "شوشه، خليج على طبيعتج، هي أحلى شي", "أحب إنج تعرفين شنو تريدين", "انتي الحلم اللي أعيشه وأنا صاحي", "شوشه، حتى النجوم تغار منج", "كل شي يكون أحلى من تكونين راضية", "انتي سبب كل ضحكة بالبيت", "شوشه، إذا حسيتي بضيق، تذكري إني أحبج", "خلي يومج مليان سلام", "انتي أحن وأقوى بنفس الوقت", "شوشه، الله يجعل أيامج كلها خير", "أحبج مثل ما تحب الوردة الشمس", "انتي المعنى الحلو للحياة", "شوشه، باقي شوية ويخلص كلشي", "خلي ثقتج بالله كبيرة", "انتي النسمة اللي تجي بعد الحر", "شوشه، أحب إنج تهتمين بكل أحد", "لو أكدر أنطيج نجمة، جان نطيتج السما", "انتي الشي اللي أفتخر بيه", "شوشه، شكد حلوة الدنيا من تبتسمين", "خلي قلبج خفيف مثل الريشة", "انتي تستاهلين كل كلمة حلوة", "شوشه، أحبج اليوم كأنه أول يوم", "كل الطرق تحلى من تمشين بيها", "انتي الدنيا كلها بعيني", "شوشه، يا حبي اللي ما يخلص", "خلي يومج يبتسملج مثل ما تبتسمين إله", "انتي إنسانة تستاهل الحب كله", "شوشه، أنا ممنون للقدر اللي جمعنا", "أحب إنج تعرفين تفرحين بالأشياء الصغيرة", "انتي النور بآخر النفق", "شوشه، كل شي حلو يبدأ بيج", "خلي الأمل دايماً وياج", "انتي كنز ما يتقدر بثمن", "شوشه، أحبج بكل نفس آخذه", "لو الحياة سفرة، انتي أحلى رفيقة", "انتي بلسم لكل تعب", "شوشه، يومج يحلى بذكرج لله", "خلي الضحكة سلاحج اليوم", "انتي القلب اللي يعرف يحب صدك", "شوشه، أنا أحبج أكثر مما تتخيلين", "كل لحظة بعيد عنج تذكرني شكد أحتاجج", "انتي جمال ما يتوصف", "شوشه، الله يحفظ ضحكتج", "خلي يومج ينتهي بفرحة", "انتي الرفيقة والحبيبة والصديقة", "شوشه، كل التعب يتبخر من أشوفج", "أحب إنج دايماً تحاولين", "انتي تستاهلين يوم كله راحة", "شوشه، قلبي يحجي عنج طول الوقت", "خلي الهدوء يملي يومج", "انتي سبب إني أصير أحسن", "شوشه، يا أحلى خبر بحياتي", "لو الشوق رسالة، جان هاي أطول رسالة", "انتي ورد بحديقة عمري", "شوشه، أحبج وراح أبقى أحبج", "خلي يومج حلو مثلج", "انتي ختام كل يوم حلو"];
 
+/* ===== Supabase — fill these two from Project Settings → API (run supabase.sql once first) ===== */
+const SUPABASE_URL = "";
+const SUPABASE_KEY = "";
+
 /* ===== Storage ===== */
-const KEY = "dawam-v1";
-let S = {name:"", regular:5, wake:false, days:{}, live:null, lastNote:null};
-try{ const raw = localStorage.getItem(KEY); if(raw) S = Object.assign(S, JSON.parse(raw)); }catch(e){}
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+const KEY = "dawam-v1", SYNC_KEY = "dawam-sync-code";
+const fresh = () => ({name:"", regular:5, wake:false, winStart:8, winEnd:20, days:{}, notes:{}, live:null, lastNote:null, updatedAt:0});
+let S = fresh();
+/* data saved before sync existed has no updatedAt: 1 lets it fill an empty cloud but lose to any real cloud save */
+try{ const raw = localStorage.getItem(KEY); if(raw){ S = Object.assign(S, JSON.parse(raw)); S.updatedAt = S.updatedAt || 1; } }catch(e){}
+function store(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ S.updatedAt = Date.now(); store(); schedulePush(); }
+
+/* ===== Sync (Supabase) ===== */
+let syncCode = "";
+try{ syncCode = localStorage.getItem(SYNC_KEY) || ""; }catch(e){}
+if(!syncCode){
+  const b = crypto.getRandomValues(new Uint8Array(10));
+  syncCode = Array.from(b, x => (x%36).toString(36)).join("") + "-" + Date.now().toString(36);
+  try{ localStorage.setItem(SYNC_KEY, syncCode); }catch(e){}
+}
+const syncOn = () => !!(SUPABASE_URL && SUPABASE_KEY && syncCode.length >= 12);
+let syncMsg = "", pushTimer = null;
+function rpc(fn, body, keepalive){
+  const h = {"Content-Type":"application/json", apikey:SUPABASE_KEY};
+  if(!SUPABASE_KEY.startsWith("sb_")) h.Authorization = "Bearer "+SUPABASE_KEY;
+  return fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/rpc/"+fn, {method:"POST", headers:h, body:JSON.stringify(body), keepalive:!!keepalive})
+    .then(r => { if(!r.ok) throw new Error(r.status); return r.status===204 ? null : r.json(); });
+}
+function syncNote(t){ syncMsg = t; const el = $("syncState"); if(el) el.textContent = t; }
+function schedulePush(){ if(!syncOn()) return; clearTimeout(pushTimer); pushTimer = setTimeout(push, 1500); }
+function push(keepalive){
+  clearTimeout(pushTimer); pushTimer = null;
+  if(!syncOn()) return;
+  rpc("dawam_put", {p_code:syncCode, p_data:S}, keepalive)
+    .then(()=> syncNote("آخر مزامنة: "+new Date().toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit"})))
+    .catch(()=> syncNote("ما صارت المزامنة، راح نحاول مرة ثانية"));
+}
+/* newer copy wins; force = take the cloud copy (after typing a code from another device) */
+function pull(force){
+  if(!syncOn()) return Promise.resolve();
+  return rpc("dawam_get", {p_code:syncCode}).then(data => {
+    if(data && typeof data==="object" && (force || (data.updatedAt||0) > (S.updatedAt||0))){
+      S = Object.assign(fresh(), data); store(); lastMode = "x"; lastGrid = ""; renderNote(false); render(); syncWake();
+    } else if(((data && data.updatedAt) || 0) < (S.updatedAt||0)) push();
+    syncNote("آخر مزامنة: "+new Date().toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit"}));
+  }).catch(()=> syncNote("ما صارت المزامنة، راح نحاول مرة ثانية"));
+}
 
 /* ===== Helpers ===== */
 const $ = id => document.getElementById(id);
@@ -358,10 +423,11 @@ const dkey = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 function fmt(ms){ const m = Math.max(0,Math.round(ms/MIN)); return Math.floor(m/60)+":"+pad(m%60); }
 function fmtS(ms){ const s = Math.max(0,Math.floor(ms/1000)); return Math.floor(s/60)+":"+pad(s%60); }
 function shuffled(n){ const a=[...Array(n).keys()]; for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
-function getMsg(kind){
-  S.alt = !S.alt;
+/* exact: the message must say what just happened (break ending, hours done), so skip the general pool */
+function getMsg(kind, exact){
+  if(!exact) S.alt = !S.alt;
   const list = MSG[kind];
-  if(S.alt && list && list.length){
+  if((exact || S.alt) && list && list.length){
     S.catPos = S.catPos || {};
     const i = (S.catPos[kind]||0) % list.length; S.catPos[kind] = i+1;
     return list[i];
@@ -371,12 +437,19 @@ function getMsg(kind){
 }
 function dayRec(k){ return S.days[k] || (S.days[k] = {segs:[], manual:null}); }
 
+/* counting window of day k as [from, to] timestamps; nothing outside it counts */
+function win(k){
+  const [y,m,d] = k.split("-").map(Number);
+  return [new Date(y,m-1,d,S.winStart).getTime(), new Date(y,m-1,d,S.winEnd).getTime()];
+}
+const clip = (a,b,w) => Math.max(0, Math.min(b,w[1]) - Math.max(a,w[0]));
+
 /* actual time worked (breaks excluded) */
 function actual(k){
-  const d = S.days[k]; let t = 0;
-  if(d){ t = d.manual != null ? d.manual : d.segs.reduce((a,s)=>a+(s[1]-s[0]),0); }
+  const d = S.days[k], w = win(k); let t = 0;
+  if(d){ t = d.manual != null ? d.manual : d.segs.reduce((a,s)=>a+clip(s[0],s[1],w),0); }
   const L = S.live;
-  if(L && L.date===k && L.mode==="work") t += Date.now()-L.segStart;
+  if(L && L.date===k && L.mode==="work") t += clip(L.segStart, Date.now(), w);
   return t;
 }
 function planned(k){ const d = S.days[k]; return (d && d.planned) || S.regular*HOUR; }
@@ -398,7 +471,7 @@ async function syncWake(){
 }
 
 /* ===== Note card ===== */
-function setNote(kind){ S.lastNote = getMsg(kind); save(); renderNote(true); }
+function setNote(kind, exact){ S.lastNote = getMsg(kind, exact); save(); renderNote(true); }
 function renderNote(animate){
   const n = $("note");
   if(!S.lastNote){ n.hidden = true; return; }
@@ -421,10 +494,15 @@ function askStart(){
   const today = S.days[dkey(new Date())];
   stH = today && today.planned ? today.planned/HOUR : S.regular;
   $("stVal").textContent = hLabel(stH);
+  const late = Date.now() >= win(dkey(new Date()))[1];
+  $("stGo").disabled = late;
+  $("stHint").textContent = late ? "الدوام ينحسب لحد الساعة "+S.winEnd+":00 بس، وهسه صار برا الوقت. تكدرين تضيفين ساعات اليوم من التقويم."
+                                 : "غيّريها بزر + و − إذا اليوم مختلف. الدوام ينحسب من "+S.winStart+":00 لحد "+S.winEnd+":00.";
   open("startSheet");
 }
 function startWork(){
   const k = dkey(new Date()), d = dayRec(k);
+  if(Date.now() >= win(k)[1]) return;
   d.planned = stH*HOUR; d.reg = null; d.ot = 0; d.asked = false;
   if(d.manual != null){ d.segs = [[Date.now()-d.manual, Date.now()]]; d.manual = null; }
   S.live = {date:k, mode:"work", segStart:Date.now()};
@@ -476,11 +554,28 @@ $("otYes").onclick = ()=>{ $("otAsk").hidden = true; $("otHours").hidden = false
 $("otSave").onclick = ()=> endDay(otDay, otH*HOUR);
 $("stGo").onclick = startWork;
 
-/* ask automatically once when today's hours are done */
+/* she forgot to press finish: close the day at the end of the counting window */
+function autoEnd(){
+  const L = S.live, k = L.date;
+  if(L.mode==="work") dayRec(k).segs.push([L.segStart, win(k)[1]]);
+  S.live = null;
+  const d = dayRec(k), a = actual(k), p = planned(k);
+  d.reg = Math.min(a, p); d.ot = Math.max(0, a - p); d.asked = true;
+  close("otSheet"); setNote("finish"); syncWake(); lastMode = "x"; render();
+}
+
+/* break reminders, ask once when today's hours are done, and auto-close after the window */
 function check(){
-  const L = S.live; if(!L || L.mode!=="work") return;
+  const L = S.live; if(!L) return;
+  if(Date.now() >= win(L.date)[1]){ autoEnd(); return; }
+  if(L.mode==="break"){
+    const left = L.brkPlan - (Date.now() - L.brkStart);
+    if(!L.over && left <= 0){ L.over = L.soon = true; setNote("restOver", true); }
+    else if(!L.soon && L.brkPlan > 5*MIN && left <= 5*MIN){ L.soon = true; setNote("restSoon", true); }
+    return;
+  }
   const d = dayRec(L.date);
-  if(!d.asked && actual(L.date) >= planned(L.date)){ d.asked = true; save(); askOvertime(L.date); }
+  if(!d.asked && actual(L.date) >= planned(L.date)){ d.asked = true; setNote("done", true); askOvertime(L.date); }
 }
 
 /* ===== Render ===== */
@@ -508,8 +603,9 @@ function renderHero(){
     const a = actual(k), p = planned(k), s = Math.floor(a/1000);
     main.style.stroke = "var(--rose)"; setRing("ringMain",C1, a/p);
     big.innerHTML = Math.floor(s/3600)+":"+pad(Math.floor(s/60)%60)+"<small>"+pad(s%60)+"</small>";
-    sub.textContent = a<p ? "باقي "+fmt(p-a)+" من "+fmt(p) : "خلص وقت الدوام";
-    $("status").textContent = "الدوام شغال";
+    sub.textContent = Date.now() < win(k)[0] ? "الحساب يبدأ الساعة "+S.winStart+":00"
+                    : a<p ? "باقي "+fmt(p-a)+" من "+fmt(p) : "خلص وقت الدوام";
+    $("status").textContent = "الدوام شغال، ينحسب لحد الساعة "+S.winEnd+":00";
   } else {
     const t = total(k), o = otOf(k), p = planned(k);
     main.style.stroke = "var(--rose)"; setRing("ringMain",C1, S.days[k] ? regOf(k)/p : 0);
@@ -549,12 +645,23 @@ function renderMonth(){
     let cls = "day";
     if(t>0){ days++; sum+=t; ot+=o; cls += o>0 ? " over" : regOf(k)>=planned(k)-MIN ? " full" : " part"; }
     if(k===todayK) cls += " today";
+    if(S.notes[k]) cls += " noted";
     html += '<button class="'+cls+'" data-k="'+k+'" aria-label="'+d+' '+MONTHS[m]+(t>0?" — "+fmt(t)+" ساعة":"")+'">'+d+(t>0?'<span class="h">'+fmt(t)+'</span>':'')+'</button>';
   }
   if(html!==lastGrid){ $("grid").innerHTML = html; lastGrid = html; }
   $("sDays").textContent = days; $("sTotal").textContent = fmt(sum); $("sOt").textContent = fmt(ot);
 }
-function render(){ renderHero(); renderActions(); renderMonth(); }
+/* today's note box; never overwrite while she is typing */
+function renderMemo(){
+  const m = $("memo"), v = S.notes[dkey(new Date())] || "";
+  if(document.activeElement !== m && m.value !== v) m.value = v;
+}
+function setNoteText(k, txt){
+  if(txt.trim()) S.notes[k] = txt; else delete S.notes[k];
+}
+$("memo").addEventListener("input", e=>{ setNoteText(dkey(new Date()), e.target.value); save(); });
+$("memo").addEventListener("blur", ()=> renderMonth());
+function render(){ renderHero(); renderActions(); renderMonth(); renderMemo(); }
 
 /* ===== Sheets ===== */
 function open(id){ $(id).classList.add("open"); }
@@ -574,9 +681,11 @@ $("grid").addEventListener("click", e=>{
   const r = Math.round(regOf(editK)/MIN), o = Math.round(otOf(editK)/MIN), has = total(editK)>0;
   $("eH").value = has ? Math.floor(r/60) : ""; $("eM").value = has ? r%60 : "";
   $("oH").value = o>0 ? Math.floor(o/60) : ""; $("oM").value = o>0 ? o%60 : "";
+  $("eNote").value = S.notes[editK] || "";
   open("editSheet");
 });
 $("eSave").onclick = ()=>{
+  setNoteText(editK, $("eNote").value);
   if(S.live && S.live.date===editK) S.live = null;
   const r = dayRec(editK), reg = hm($("eH").value,$("eM").value);
   r.segs = []; r.manual = reg; r.reg = reg; r.ot = hm($("oH").value,$("oM").value);
@@ -592,12 +701,19 @@ $("nextM").onclick = ()=>{ view.setMonth(view.getMonth()+1); render(); };
 
 $("openSettings").onclick = ()=>{
   $("sName").value = S.name; $("sReg").value = S.regular; $("sWake").checked = S.wake;
+  $("sWinS").value = S.winStart; $("sWinE").value = S.winEnd; $("sSync").value = syncCode;
+  syncNote(syncOn() ? syncMsg : "المزامنة مو مفعّلة بعد");
   open("setSheet");
 };
 $("sSave").onclick = ()=>{
   S.name = $("sName").value.trim(); S.regular = Math.min(12, Math.max(1, +$("sReg").value || 5));
   S.wake = $("sWake").checked;
+  const ws = Math.round(+$("sWinS").value), we = Math.round(+$("sWinE").value);
+  if(ws >= 0 && we <= 24 && ws < we){ S.winStart = ws; S.winEnd = we; }
+  const code = $("sSync").value.trim(), changed = code.length >= 12 && code !== syncCode;
+  if(changed){ syncCode = code; try{ localStorage.setItem(SYNC_KEY, code); }catch(e){} }
   save(); close("setSheet"); syncWake(); lastMode="x"; render();
+  if(changed) pull(true);
 };
 
 /* ===== Confetti for a full day ===== */
@@ -614,8 +730,12 @@ function confetti(){
 }
 
 /* ===== Loop ===== */
-document.addEventListener("visibilitychange", ()=>{ if(!document.hidden){ check(); render(); syncWake(); } });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.hidden){ if(pushTimer) push(true); return; }
+  pull().then(()=>{ check(); render(); syncWake(); });
+});
 render(); renderNote(false); check(); syncWake();
+pull().then(()=>{ check(); render(); });
 setInterval(()=>{ check(); renderHero(); renderActions(); }, 1000);
 setInterval(renderMonth, 30000);
 </script>
