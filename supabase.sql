@@ -44,3 +44,5 @@ revoke all on function public.dawam_get(text) from public;
 revoke all on function public.dawam_put(text, jsonb) from public;
 grant execute on function public.dawam_get(text) to anon;
 grant execute on function public.dawam_put(text, jsonb) to anon;
+revoke execute on function public.dawam_get(text) from authenticated;
+revoke execute on function public.dawam_put(text, jsonb) from authenticated;
