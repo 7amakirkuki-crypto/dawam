@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>رسائل لشوشه</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="رسائل شوشه">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FBF3F6; --surface:#FFFFFF; --ink:#2A1E2E; --muted:#7D6A7B;
+  --rose:#D3426B; --rose-soft:#F6D3DE; --line:#EADCE2;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
+    --rose:#F06C92; --rose-soft:#4A2636; --line:#382A3E; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
+  --rose:#F06C92; --rose-soft:#4A2636; --line:#382A3E; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Readex Pro","Segoe UI",Tahoma,"Noto Sans Arabic",sans-serif;line-height:1.6}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--rose);outline-offset:2px}
+.wrap{max-width:460px;margin:0 auto;padding:22px 16px 40px}
+h1{font-size:1.35rem;font-weight:600;margin:0}
+.lead{color:var(--muted);font-size:.9rem;margin:2px 0 18px}
+textarea{display:block;width:100%;min-height:120px;border-radius:16px;border:1.5px solid var(--line);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:1.05rem;padding:12px 14px;resize:vertical}
+.btn{width:100%;min-height:52px;margin-top:10px;border-radius:16px;border:0;background:var(--rose);color:#fff;font-weight:600;font-size:1.05rem}
+.btn:disabled{opacity:.5}
+.state{min-height:1.4em;font-size:.88rem;color:var(--muted);margin:8px 0 0;text-align:center}
+h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
+.list{display:flex;flex-direction:column;gap:8px}
+.msg{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.msg p{flex:1;margin:0;white-space:pre-line;overflow-wrap:anywhere}
+.msg small{display:block;color:var(--muted);font-size:.8rem;margin-top:4px}
+.msg.seen small{color:var(--rose)}
+.del{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--muted);display:grid;place-items:center}
+.del svg{width:18px;height:18px}
+.empty{color:var(--muted);font-size:.9rem;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>رسائل لشوشه 🤍</h1>
+  <p class="lead">اللي تكتبه هنا يطلعلها بدوامي، ويبقى لحد ما تدوس على القلب.</p>
+
+  <label for="body" style="display:block;font-weight:600;margin-bottom:6px">رسالة جديدة</label>
+  <textarea id="body" maxlength="2000" placeholder="اكتبلها شي حلو…"></textarea>
+  <button class="btn" id="send">دز الرسالة</button>
+  <p class="state" id="state" role="status"></p>
+
+  <h2>تنتظر تشوفها</h2>
+  <div class="list" id="waiting"></div>
+
+  <h2>شافتها ودست على القلب</h2>
+  <div class="list" id="seen"></div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://ttdmnxsatgrnpuawhbyp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_fhgalEOVWNyWMYU4qB3Dbg_64xqoJ-Y";
+const $ = id => document.getElementById(id);
+const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+
+function rest(path, opt){
+  opt = opt || {};
+  return fetch(SUPABASE_URL+"/rest/v1/"+path, {method:opt.method||"GET", body:opt.body,
+    headers:{"Content-Type":"application/json", apikey:SUPABASE_KEY}})
+    .then(r => { if(!r.ok) throw new Error(r.status); return r.text().then(t => t ? JSON.parse(t) : null); });
+}
+const when = iso => new Date(iso).toLocaleString("ar-IQ",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
+
+function item(m){
+  const row = document.createElement("div"); row.className = "msg" + (m.hearted_at ? " seen" : "");
+  const p = document.createElement("p"); p.textContent = m.body;
+  const s = document.createElement("small");
+  s.textContent = m.hearted_at ? "❤️ " + when(m.hearted_at) : "انكتبت " + when(m.created_at);
+  p.appendChild(s);
+  const d = document.createElement("button"); d.className = "del"; d.innerHTML = TRASH; d.setAttribute("aria-label","امسح الرسالة");
+  d.onclick = () => { if(confirm("تمسح هاي الرسالة؟")) rest("dawam_messages?id=eq."+m.id, {method:"DELETE"}).then(load).catch(()=> $("state").textContent = "ما انمسحت، جرب مرة ثانية"); };
+  row.append(p, d); return row;
+}
+function fill(id, rows, emptyText){
+  const box = $(id); box.innerHTML = "";
+  if(!rows.length){ const e = document.createElement("p"); e.className = "empty"; e.textContent = emptyText; box.appendChild(e); return; }
+  rows.forEach(m => box.appendChild(item(m)));
+}
+function load(){
+  return rest("dawam_messages?select=id,body,created_at,hearted_at&order=created_at.desc&limit=200").then(rows => {
+    fill("waiting", rows.filter(m => !m.hearted_at), "ماكو رسائل تنتظر.");
+    fill("seen", rows.filter(m => m.hearted_at), "بعد ما داست على أي قلب.");
+  }).catch(()=> $("state").textContent = "ما گدرت أجيب الرسائل، تأكد من الإنترنت");
+}
+$("send").onclick = () => {
+  const body = $("body").value.trim(); if(!body) return;
+  $("send").disabled = true; $("state").textContent = "";
+  rest("dawam_messages", {method:"POST", body:JSON.stringify({body})})
+    .then(() => { $("body").value = ""; $("state").textContent = "وصلت، راح تطلعلها من تفتح دوامي 🤍"; return load(); })
+    .catch(() => $("state").textContent = "ما وصلت، جرب مرة ثانية")
+    .finally(() => $("send").disabled = false);
+};
+document.addEventListener("visibilitychange", () => { if(!document.hidden) load(); });
+load();
+</script>
+</body>
+</html>

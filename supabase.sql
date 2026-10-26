@@ -1,6 +1,6 @@
 -- Dawam cloud copy. Run once in Supabase → SQL Editor.
--- The table itself is closed; the app reaches it only through the two
--- functions below, and only with the sync code saved in the app's settings.
+-- Everyone with the link shares one copy, stored under the code 'dawam-shared-main'.
+-- The state table is reached only through the two functions below.
 
 create table if not exists public.dawam_state (
   code       text primary key check (length(code) >= 12),
@@ -46,3 +46,28 @@ grant execute on function public.dawam_get(text) to anon;
 grant execute on function public.dawam_put(text, jsonb) to anon;
 revoke execute on function public.dawam_get(text) from authenticated;
 revoke execute on function public.dawam_put(text, jsonb) from authenticated;
+
+-- one shared copy: start it from the fullest existing copy
+insert into public.dawam_state (code, data, updated_at)
+select 'dawam-shared-main', data, now()
+from public.dawam_state
+where code <> 'dawam-shared-main'
+order by (select count(*) from jsonb_object_keys(coalesce(data->'days','{}'::jsonb))) desc, updated_at desc
+limit 1
+on conflict (code) do nothing;
+
+-- love notes written from admin.html, shown as tasks in the app until she taps the heart
+create table if not exists public.dawam_messages (
+  id         bigint generated always as identity primary key,
+  body       text not null check (length(body) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  hearted_at timestamptz
+);
+
+alter table public.dawam_messages enable row level security;
+-- open on purpose: anyone with the link may read, write and heart
+create policy "dawam messages open read"   on public.dawam_messages for select to anon using (true);
+create policy "dawam messages open insert" on public.dawam_messages for insert to anon with check (hearted_at is null);
+create policy "dawam messages open update" on public.dawam_messages for update to anon using (true) with check (true);
+create policy "dawam messages open delete" on public.dawam_messages for delete to anon using (true);
+grant select, insert, update, delete on public.dawam_messages to anon;
