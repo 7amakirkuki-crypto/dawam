@@ -256,7 +256,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
       </div>
       <button class="btn primary" style="width:100%" id="otSave">حفظ الإضافي</button>
     </div>
-    <button class="btn ghost" style="width:100%;margin-top:10px;border:0" data-close>بعدني بالدوام</button>
+    <button class="btn ghost" style="width:100%;margin-top:10px;border:0" data-close id="otLater">بعدني بالدوام</button>
   </div>
 </div>
 
@@ -501,6 +501,8 @@ bindStepper("otPlus","otMinus",()=>otH,v=>otH=v,0.5,12,"otVal");
 function askStart(){
   const today = S.days[dkey(new Date())];
   stH = today && today.planned ? today.planned/HOUR : S.regular;
+  /* back after the day already closed: offer one more hour so it doesn't close again right away */
+  if(today && today.reg != null && !S.live) stH = Math.min(16, Math.max(stH, Math.ceil(actual(dkey(new Date()))/HOUR*2)/2) + 1);
   $("stVal").textContent = hLabel(stH);
   const late = Date.now() >= win(dkey(new Date()))[1];
   $("stGo").disabled = late;
@@ -540,6 +542,7 @@ function askOvertime(k){
   $("otVal").textContent = hLabel(otH);
   $("otHint").textContent = "دوامج اليوم "+hLabel(planned(k)/HOUR)+" ساعة. داومتي إضافي؟";
   $("otAsk").hidden = false; $("otHours").hidden = true;
+  $("otLater").hidden = !S.live;
   open("otSheet");
 }
 function endDay(k, otMs){
@@ -586,8 +589,17 @@ function check(){
     if(!L.soon && L.brkPlan > 5*MIN && left <= 5*MIN){ L.soon = true; setNote("restSoon", true); }
     return;
   }
-  const d = dayRec(L.date);
-  if(!d.asked && actual(L.date) >= planned(L.date)){ d.asked = true; setNote("done", true); askOvertime(L.date); }
+  if(actual(L.date) >= planned(L.date)) hoursDone(L.date);
+}
+
+/* her hours are done: close the day at the exact moment; overtime only if she says so */
+function hoursDone(k){
+  const L = S.live, over = actual(k) - planned(k);
+  dayRec(k).segs.push([L.segStart, Math.max(L.segStart, Date.now() - over)]);
+  S.live = null;
+  const d = dayRec(k); d.reg = planned(k); d.ot = 0; d.asked = true;
+  setNote("done", true); syncWake(); lastMode = "x"; render();
+  askOvertime(k);
 }
 
 /* ===== Render ===== */

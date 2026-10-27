@@ -160,6 +160,7 @@ function status(){
   const planned = (d && d.planned) || (her.regular||5)*HOUR;
   let worked = d ? (d.manual != null ? d.manual : (d.segs||[]).reduce((a,s)=>a+clipW(s[0],s[1],w),0)) : 0;
   if(L && L.mode==="work") worked += clipW(L.segStart, now, w);
+  if(L && L.mode==="work" && worked >= planned){ worked = planned; L = null; }  /* the day closes once her hours are done */
   if(L && now >= w[1]) L = null;
   if(!L){
     const done = d ? (d.reg != null ? d.reg + (d.ot||0) : worked) : 0;
