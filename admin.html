@@ -15,6 +15,7 @@
 :root{
   --bg:#FBF3F6; --surface:#FFFFFF; --ink:#2A1E2E; --muted:#7D6A7B;
   --rose:#D3426B; --rose-soft:#F6D3DE; --line:#EADCE2;
+  --gold:#D0921A; --gold-soft:#F7E6C2; --teal:#23897D; --teal-soft:#CDEBE6;
   color-scheme:light; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
@@ -22,11 +23,13 @@
   :root:not([data-theme="light"]){
     --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
     --rose:#F06C92; --rose-soft:#4A2636; --line:#382A3E; color-scheme:dark;
+    --gold:#F0B640; --gold-soft:#4A3A1C; --teal:#4CC2B2; --teal-soft:#1C3B37;
   }
 }
 :root[data-theme="dark"]{
   --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
   --rose:#F06C92; --rose-soft:#4A2636; --line:#382A3E; color-scheme:dark;
+  --gold:#F0B640; --gold-soft:#4A3A1C; --teal:#4CC2B2; --teal-soft:#1C3B37;
 }
 *,*::before,*::after{box-sizing:inherit}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -50,12 +53,35 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
 .del{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--muted);display:grid;place-items:center}
 .del svg{width:18px;height:18px}
 .empty{color:var(--muted);font-size:.9rem;margin:0}
+.live{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:22px;text-align:center}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:.88rem;font-weight:600;background:var(--line);color:var(--muted)}
+.chip i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.live.work .chip{background:var(--rose-soft);color:var(--rose)}
+.live.break .chip{background:var(--teal-soft);color:var(--teal)}
+.live.back .chip{background:var(--gold-soft);color:var(--gold)}
+.live.work .chip i,.live.break .chip i,.live.back .chip i{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.timer{font-size:clamp(2.4rem,13vw,3.2rem);font-weight:600;line-height:1.1;margin:10px 0 2px;direction:ltr;font-variant-numeric:tabular-nums}
+.timer small{font-size:.45em;opacity:.6}
+.lsub{margin:0;color:var(--muted);font-size:.92rem}
+.bar{height:8px;border-radius:99px;background:var(--line);margin:12px 4px 0;overflow:hidden}
+.bar b{display:block;height:100%;width:0;background:var(--rose);border-radius:99px;transition:width .6s ease}
+.live.break .bar b{background:var(--teal)}
+.seen-at{margin:10px 0 0;font-size:.78rem;color:var(--muted)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>رسائل لشوشه 🤍</h1>
   <p class="lead">اللي تكتبه هنا يطلعلها بدوامي، ويبقى لحد ما تدوس على القلب.</p>
+
+  <section class="live" id="live" aria-live="polite">
+    <span class="chip"><i></i><span id="lChip">…</span></span>
+    <div class="timer" id="lTimer">--:--</div>
+    <p class="lsub" id="lSub"></p>
+    <div class="bar"><b id="lBar"></b></div>
+    <p class="seen-at" id="lSeen"></p>
+  </section>
 
   <label for="body" style="display:block;font-weight:600;margin-bottom:6px">رسالة جديدة</label>
   <textarea id="body" maxlength="2000" placeholder="اكتبلها شي حلو…"></textarea>
@@ -112,8 +138,61 @@ $("send").onclick = () => {
     .catch(() => $("state").textContent = "ما وصلت، جرب مرة ثانية")
     .finally(() => $("send").disabled = false);
 };
-document.addEventListener("visibilitychange", () => { if(!document.hidden) load(); });
-load();
+/* ===== Her live status, worked out from the shared copy the app saves (same rules as index.html) ===== */
+const MIN = 60000, HOUR = 60*MIN, SHARED = "dawam-shared-main";
+const pad = n => String(n).padStart(2,"0");
+const dkey = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const fmt = ms => { const m = Math.max(0,Math.round(ms/MIN)); return Math.floor(m/60)+":"+pad(m%60); };
+const clock = ms => { const s = Math.max(0,Math.floor(ms/1000)); return Math.floor(s/3600)+":"+pad(Math.floor(s/60)%60)+"<small>"+pad(s%60)+"</small>"; };
+const hhmm = t => new Date(t).toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit"});
+let her = null;
+function win(k){
+  const [y,m,d] = k.split("-").map(Number);
+  return [new Date(y,m-1,d,her.winStart??8).getTime(), new Date(y,m-1,d,her.winEnd??20).getTime()];
+}
+const clipW = (a,b,w) => Math.max(0, Math.min(b,w[1]) - Math.max(a,w[0]));
+function status(){
+  const now = Date.now(), today = dkey(new Date());
+  let L = her.live ? Object.assign({}, her.live) : null;
+  /* her app may be closed: apply the same automatic steps it would */
+  if(L && L.mode==="break" && now >= L.brkStart + L.brkPlan) L = {date:L.date, mode:"work", segStart:L.brkStart + L.brkPlan};
+  const k = L ? L.date : today, d = (her.days||{})[k], w = win(k);
+  const planned = (d && d.planned) || (her.regular||5)*HOUR;
+  let worked = d ? (d.manual != null ? d.manual : (d.segs||[]).reduce((a,s)=>a+clipW(s[0],s[1],w),0)) : 0;
+  if(L && L.mode==="work") worked += clipW(L.segStart, now, w);
+  if(L && now >= w[1]) L = null;
+  if(!L){
+    const done = d ? (d.reg != null ? d.reg + (d.ot||0) : worked) : 0;
+    return done > 0 ? {cls:"off", chip:"خلصت دوام اليوم", timer:clock(done), sub: d && d.ot ? "منها إضافي +"+fmt(d.ot) : "يعطيها العافية", frac:1}
+                    : {cls:"off", chip:"بعدها ما بدأت الدوام", timer:"0:00", sub:"الدوام ينحسب من "+(her.winStart??8)+":00 لحد "+(her.winEnd??20)+":00", frac:0};
+  }
+  if(L.mode==="break"){
+    const left = L.brkStart + L.brkPlan - now;
+    return {cls:"break", chip:"استراحة", timer:clock(left), sub:"ترجع للدوام الساعة "+hhmm(L.brkStart+L.brkPlan)+" · اشتغلت "+fmt(worked), frac:(now-L.brkStart)/L.brkPlan};
+  }
+  const back = d && (d.segs||[]).length && now - L.segStart < 15*MIN;
+  const sub = now < w[0] ? "الحساب يبدأ الساعة "+(her.winStart??8)+":00"
+            : worked < planned ? "باقي "+fmt(planned-worked)+" من "+fmt(planned) : "كملت ساعاتها، هسه إضافي +"+fmt(worked-planned);
+  return {cls: back ? "back" : "work", chip: back ? "رجعت من الاستراحة" : "بالدوام", timer:clock(worked), sub, frac:worked/planned};
+}
+function renderLive(){
+  if(!her) return;
+  const v = status();
+  $("live").className = "live " + v.cls;
+  $("lChip").textContent = v.chip; $("lTimer").innerHTML = v.timer; $("lSub").textContent = v.sub;
+  $("lBar").style.width = Math.min(100, Math.max(0, v.frac*100)) + "%";
+  $("lSeen").textContent = her.updatedAt > 1 ? "آخر تحديث من موبايلها: " + hhmm(her.updatedAt) : "";
+}
+function loadHer(){
+  return rest("rpc/dawam_get", {method:"POST", body:JSON.stringify({p_code:SHARED})})
+    .then(d => { if(d) { her = d; renderLive(); } else { $("lChip").textContent = "بعد ماكو بيانات"; } })
+    .catch(() => { $("lSub").textContent = "ما گدرت أجيب حالتها، تأكد من الإنترنت"; });
+}
+
+document.addEventListener("visibilitychange", () => { if(!document.hidden){ load(); loadHer(); } });
+load(); loadHer();
+setInterval(renderLive, 1000);
+setInterval(loadHer, 20000);
 </script>
 </body>
 </html>

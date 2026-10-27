@@ -575,11 +575,15 @@ function autoEnd(){
 /* break reminders, ask once when today's hours are done, and auto-close after the window */
 function check(){
   const L = S.live; if(!L) return;
+  /* the break ends by itself: work time counts again from the moment it ran out, even if the app was closed */
+  if(L.mode==="break" && Date.now() >= L.brkStart + L.brkPlan){
+    Object.assign(L, {mode:"work", segStart:L.brkStart + L.brkPlan});
+    setNote("restOver", true); render();
+  }
   if(Date.now() >= win(L.date)[1]){ autoEnd(); return; }
   if(L.mode==="break"){
     const left = L.brkPlan - (Date.now() - L.brkStart);
-    if(!L.over && left <= 0){ L.over = L.soon = true; setNote("restOver", true); }
-    else if(!L.soon && L.brkPlan > 5*MIN && left <= 5*MIN){ L.soon = true; setNote("restSoon", true); }
+    if(!L.soon && L.brkPlan > 5*MIN && left <= 5*MIN){ L.soon = true; setNote("restSoon", true); }
     return;
   }
   const d = dayRec(L.date);
