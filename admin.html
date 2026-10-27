@@ -15,7 +15,7 @@
 :root{
   --bg:#FBF3F6; --surface:#FFFFFF; --ink:#2A1E2E; --muted:#7D6A7B;
   --rose:#D3426B; --rose-soft:#F6D3DE; --line:#EADCE2;
-  --gold:#D0921A; --gold-soft:#F7E6C2; --teal:#23897D; --teal-soft:#CDEBE6;
+  --gold:#D0921A; --gold-soft:#F7E6C2; --teal:#23897D; --teal-soft:#CDEBE6; --green:#2E9E5B; --green-soft:#D4F0DF;
   color-scheme:light; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
@@ -23,13 +23,13 @@
   :root:not([data-theme="light"]){
     --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
     --rose:#F06C92; --rose-soft:#4A2636; --line:#382A3E; color-scheme:dark;
-    --gold:#F0B640; --gold-soft:#4A3A1C; --teal:#4CC2B2; --teal-soft:#1C3B37;
+    --gold:#F0B640; --gold-soft:#4A3A1C; --teal:#4CC2B2; --teal-soft:#1C3B37; --green:#5CCB8A; --green-soft:#1D3A29;
   }
 }
 :root[data-theme="dark"]{
   --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
   --rose:#F06C92; --rose-soft:#4A2636; --line:#382A3E; color-scheme:dark;
-  --gold:#F0B640; --gold-soft:#4A3A1C; --teal:#4CC2B2; --teal-soft:#1C3B37;
+  --gold:#F0B640; --gold-soft:#4A3A1C; --teal:#4CC2B2; --teal-soft:#1C3B37; --green:#5CCB8A; --green-soft:#1D3A29;
 }
 *,*::before,*::after{box-sizing:inherit}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -67,6 +67,10 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
 .bar{height:8px;border-radius:99px;background:var(--line);margin:12px 4px 0;overflow:hidden}
 .bar b{display:block;height:100%;width:0;background:var(--rose);border-radius:99px;transition:width .6s ease}
 .live.break .bar b{background:var(--teal)}
+.live.offday .chip{background:var(--green-soft);color:var(--green)}
+.live.offday .bar b{background:var(--green)}
+.reply-box{margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--rose-soft);font-size:.95rem;white-space:pre-line}
+.reply-box b{display:block;font-size:.78rem;font-weight:600;color:var(--rose);margin-bottom:2px}
 .seen-at{margin:10px 0 0;font-size:.78rem;color:var(--muted)}
 </style>
 </head>
@@ -91,7 +95,7 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
   <h2>تنتظر تشوفها</h2>
   <div class="list" id="waiting"></div>
 
-  <h2>شافتها ودست على القلب</h2>
+  <h2>شافتها (قلب أو رد)</h2>
   <div class="list" id="seen"></div>
 </div>
 
@@ -115,6 +119,11 @@ function item(m){
   const s = document.createElement("small");
   s.textContent = m.hearted_at ? "❤️ " + when(m.hearted_at) : "انكتبت " + when(m.created_at);
   p.appendChild(s);
+  if(m.reply){
+    const r = document.createElement("div"); r.className = "reply-box";
+    const h = document.createElement("b"); h.textContent = "ردها · " + when(m.replied_at);
+    r.append(h, document.createTextNode(m.reply)); p.appendChild(r);
+  }
   const d = document.createElement("button"); d.className = "del"; d.innerHTML = TRASH; d.setAttribute("aria-label","امسح الرسالة");
   d.onclick = () => { if(confirm("تمسح هاي الرسالة؟")) rest("dawam_messages?id=eq."+m.id, {method:"DELETE"}).then(load).catch(()=> $("state").textContent = "ما انمسحت، جرب مرة ثانية"); };
   row.append(p, d); return row;
@@ -125,7 +134,7 @@ function fill(id, rows, emptyText){
   rows.forEach(m => box.appendChild(item(m)));
 }
 function load(){
-  return rest("dawam_messages?select=id,body,created_at,hearted_at&order=created_at.desc&limit=200").then(rows => {
+  return rest("dawam_messages?select=id,body,created_at,hearted_at,reply,replied_at&order=created_at.desc&limit=200").then(rows => {
     fill("waiting", rows.filter(m => !m.hearted_at), "ماكو رسائل تنتظر.");
     fill("seen", rows.filter(m => m.hearted_at), "بعد ما داست على أي قلب.");
   }).catch(()=> $("state").textContent = "ما گدرت أجيب الرسائل، تأكد من الإنترنت");
@@ -162,6 +171,8 @@ function status(){
   if(L && L.mode==="work") worked += clipW(L.segStart, now, w);
   if(L && L.mode==="work" && worked >= planned){ worked = planned; L = null; }  /* the day closes once her hours are done */
   if(L && now >= w[1]) L = null;
+  if(!L && d && d.off)
+    return {cls:"offday", chip:"أوف اليوم 🌿", timer:clock(d.reg||planned), sub: d.offPlan ? "تريد تسوي: "+d.offPlan : "يوم راحة", frac:1};
   if(!L){
     const done = d ? (d.reg != null ? d.reg + (d.ot||0) : worked) : 0;
     return done > 0 ? {cls:"off", chip:"خلصت دوام اليوم", timer:clock(done), sub: d && d.ot ? "منها إضافي +"+fmt(d.ot) : "يعطيها العافية", frac:1}
@@ -194,6 +205,7 @@ document.addEventListener("visibilitychange", () => { if(!document.hidden){ load
 load(); loadHer();
 setInterval(renderLive, 1000);
 setInterval(loadHer, 20000);
+setInterval(load, 30000);
 </script>
 </body>
 </html>

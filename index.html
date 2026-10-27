@@ -15,7 +15,7 @@
 :root{
   --bg:#FBF3F6; --surface:#FFFFFF; --ink:#2A1E2E; --muted:#7D6A7B;
   --rose:#D3426B; --rose-soft:#F6D3DE; --gold:#D0921A; --gold-soft:#F7E6C2;
-  --teal:#23897D; --teal-soft:#CDEBE6; --track:#EEDFE5; --line:#EADCE2;
+  --teal:#23897D; --teal-soft:#CDEBE6; --green:#2E9E5B; --green-soft:#D4F0DF; --track:#EEDFE5; --line:#EADCE2;
   color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -25,14 +25,14 @@
   :root:not([data-theme="light"]){
     --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
     --rose:#F06C92; --rose-soft:#4A2636; --gold:#F0B640; --gold-soft:#4A3A1C;
-    --teal:#4CC2B2; --teal-soft:#1C3B37; --track:#33263A; --line:#382A3E;
+    --teal:#4CC2B2; --teal-soft:#1C3B37; --green:#5CCB8A; --green-soft:#1D3A29; --track:#33263A; --line:#382A3E;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#18121B; --surface:#241B28; --ink:#F5EAF0; --muted:#A896A6;
   --rose:#F06C92; --rose-soft:#4A2636; --gold:#F0B640; --gold-soft:#4A3A1C;
-  --teal:#4CC2B2; --teal-soft:#1C3B37; --track:#33263A; --line:#382A3E;
+  --teal:#4CC2B2; --teal-soft:#1C3B37; --green:#5CCB8A; --green-soft:#1D3A29; --track:#33263A; --line:#382A3E;
   color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:inherit}
@@ -67,6 +67,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .btn.primary{background:var(--rose);color:#fff}
 .btn.rest{background:var(--teal-soft);color:var(--teal)}
 .btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.btn.off{background:var(--green);color:#fff;flex:.55}
 .btn:active{transform:scale(.98)}
 .alarm{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;min-height:48px;border-radius:16px;
   border:1.5px dashed var(--line);color:var(--ink);text-decoration:none;font-size:.95rem}
@@ -99,6 +100,7 @@ section.month{margin-top:30px}
 .day.part{background:var(--rose-soft)}
 .day.full{background:var(--rose);color:#fff}
 .day.over{background:var(--rose);color:#fff;box-shadow:inset 0 0 0 3px var(--gold)}
+.day.off{background:var(--green);color:#fff}
 .day.today{outline:2px solid var(--ink);outline-offset:1px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted);margin-top:10px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-1px;margin-inline-end:5px}
@@ -128,7 +130,10 @@ section.month{margin-top:30px}
 .love small{display:block;color:var(--muted);font-size:.8rem;margin-top:4px}
 .heart{flex:none;width:52px;height:52px;border-radius:50%;border:1.5px solid var(--rose-soft);background:var(--bg);color:var(--rose);display:grid;place-items:center;transition:transform .2s ease}
 .heart svg{width:26px;height:26px;transition:transform .25s ease}
-.heart:active{transform:scale(.92)}
+.heart:active,.reply:active{transform:scale(.92)}
+.love-btns{display:flex;flex-direction:column;gap:8px;flex:none}
+.reply{width:52px;height:40px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);color:var(--muted);font-size:.85rem;font-weight:600}
+.love.gone .reply{opacity:0}
 .love.gone{opacity:0;transform:translateX(-30px);max-height:0;padding-top:0;padding-bottom:0;margin-top:-10px;border-width:0}
 .love.gone .heart svg{transform:scale(1.35);fill:currentColor}
 .memo{margin:18px 0 0}
@@ -218,6 +223,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
       <span><i style="background:var(--rose-soft)"></i>أقل من ساعات اليوم</span>
       <span><i style="background:var(--rose)"></i>دوام كامل</span>
       <span><i style="background:var(--rose);box-shadow:inset 0 0 0 2px var(--gold)"></i>بيه إضافي</span>
+      <span><i style="background:var(--green)"></i>أوف</span>
     </div>
     <p class="small-msg">اضغطي على أي يوم حتى تضيفين أو تعدلين ساعاته.</p>
   </section>
@@ -287,12 +293,35 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
       <div class="field"><label for="oH">ساعات</label><input id="oH" type="number" min="0" max="16" inputmode="numeric"></div>
       <div class="field"><label for="oM">دقايق</label><input id="oM" type="number" min="0" max="59" inputmode="numeric"></div>
     </div>
+    <label class="toggle" style="margin-bottom:10px"><span>يوم أوف (ينحسب دوام كامل)</span><input type="checkbox" id="eOff"></label>
     <p class="sec">ملاحظات</p>
     <textarea id="eNote" rows="3" style="margin-bottom:14px"></textarea>
     <div class="actions">
       <button class="btn primary" id="eSave">حفظ</button>
       <button class="btn ghost" id="eDel">مسح اليوم</button>
     </div>
+    <button class="btn ghost" style="width:100%;margin-top:10px;border:0" data-close>إلغاء</button>
+  </div>
+</div>
+
+<!-- Day off sheet -->
+<div class="scrim" id="offSheet" role="dialog" aria-modal="true" aria-labelledby="offT">
+  <div class="sheet">
+    <h3 id="offT">اليوم أوف 🌿</h3>
+    <p class="hint">ينحسبلج دوام كامل. شنو تريدين تسوين بهاليوم؟</p>
+    <textarea id="offPlan" rows="3" maxlength="500" placeholder="مثلاً: أنام للظهر وأطلع ويا أهلي…" style="margin-bottom:14px"></textarea>
+    <button class="btn off" style="width:100%" id="offGo">خليه أوف</button>
+    <button class="btn ghost" style="width:100%;margin-top:10px;border:0" data-close>إلغاء</button>
+  </div>
+</div>
+
+<!-- Reply sheet -->
+<div class="scrim" id="replySheet" role="dialog" aria-modal="true" aria-labelledby="rT">
+  <div class="sheet">
+    <h3 id="rT">ردي على حمه</h3>
+    <p class="hint" id="rMsg" style="white-space:pre-line"></p>
+    <textarea id="rText" rows="3" maxlength="2000" placeholder="اكتبي ردج…" style="margin-bottom:14px"></textarea>
+    <button class="btn primary" style="width:100%" id="rSend">دزي الرد</button>
     <button class="btn ghost" style="width:100%;margin-top:10px;border:0" data-close>إلغاء</button>
   </div>
 </div>
@@ -365,6 +394,11 @@ const MSG = {
   done: [
     "كملتي الدوام يا شوشه! تسلم إيدج، وأي دقيقة بعد هسه تنحسب إضافي",
     "دوام كامل ببطولة، يعطيج العافية 🤍"
+  ],
+  off: [
+    "يوم أوف حلو يا شوشه، ارتاحي واستمتعي بكل دقيقة 🌿",
+    "اليوم إلج وحدج، سوي اللي يفرحج",
+    "أوف! ولا تفكرين بالشغل نهائياً اليوم 🤍"
   ],
   finish: [
     "يعطيج العافية يا شوشه، ارجعي بالسلامة",
@@ -630,6 +664,11 @@ function renderHero(){
     sub.textContent = Date.now() < win(k)[0] ? "الحساب يبدأ الساعة "+S.winStart+":00"
                     : a<p ? "باقي "+fmt(p-a)+" من "+fmt(p) : "خلص وقت الدوام";
     $("status").textContent = "الدوام شغال، ينحسب لحد الساعة "+S.winEnd+":00";
+  } else if(S.days[k] && S.days[k].off){
+    const d = S.days[k];
+    main.style.stroke = "var(--green)"; setRing("ringMain",C1,1);
+    big.textContent = "أوف"; sub.textContent = "ينحسب "+fmt(total(k));
+    $("status").textContent = d.offPlan ? "اليوم إلج: "+d.offPlan : "يوم راحة حلو 🌿";
   } else {
     const t = total(k), o = otOf(k), p = planned(k);
     main.style.stroke = "var(--rose)"; setRing("ringMain",C1, S.days[k] ? regOf(k)/p : 0);
@@ -645,11 +684,13 @@ function renderHero(){
 
 let lastMode = "x";
 function renderActions(){
-  const L = S.live, mode = L ? L.mode : (total(dkey(new Date()))>0 ? "doneToday" : "idle");
+  const L = S.live, tk = dkey(new Date()), td = S.days[tk];
+  const mode = L ? L.mode : td && td.off ? "off" : total(tk)>0 ? "doneToday" : "idle";
   if(mode===lastMode) return; lastMode = mode;
   const a = $("actions"); a.innerHTML = "";
   const mk = (txt, cls, fn) => { const b=document.createElement("button"); b.className="btn "+cls; b.textContent=txt; b.onclick=fn; a.appendChild(b); };
-  if(mode==="idle") mk("بدأت الدوام","primary",askStart);
+  if(mode==="idle"){ mk("بدأت الدوام","primary",askStart); mk("أوف","off",askOff); }
+  if(mode==="off") mk("إلغاء الأوف","ghost",cancelOff);
   if(mode==="doneToday") mk("رجعت للدوام","ghost",askStart);
   if(mode==="work"){ mk("استراحة","rest",()=>open("breakSheet")); mk("خلصت الدوام","primary",finish); }
   if(mode==="break"){ mk("رجعت من الاستراحة","primary",backToWork); mk("خلصت الدوام","ghost",finish); }
@@ -667,7 +708,7 @@ function renderMonth(){
   for(let d=1; d<=n; d++){
     const k = y+"-"+pad(m+1)+"-"+pad(d), t = total(k), o = otOf(k);
     let cls = "day";
-    if(t>0){ days++; sum+=t; ot+=o; cls += o>0 ? " over" : regOf(k)>=planned(k)-MIN ? " full" : " part"; }
+    if(t>0){ days++; sum+=t; ot+=o; cls += S.days[k].off ? " off" : o>0 ? " over" : regOf(k)>=planned(k)-MIN ? " full" : " part"; }
     if(k===todayK) cls += " today";
     if(S.notes[k]) cls += " noted";
     html += '<button class="'+cls+'" data-k="'+k+'" aria-label="'+d+' '+MONTHS[m]+(t>0?" — "+fmt(t)+" ساعة":"")+'">'+d+(t>0?'<span class="h">'+fmt(t)+'</span>':'')+'</button>';
@@ -706,6 +747,7 @@ $("grid").addEventListener("click", e=>{
   $("eH").value = has ? Math.floor(r/60) : ""; $("eM").value = has ? r%60 : "";
   $("oH").value = o>0 ? Math.floor(o/60) : ""; $("oM").value = o>0 ? o%60 : "";
   $("eNote").value = S.notes[editK] || "";
+  $("eOff").checked = !!(S.days[editK] && S.days[editK].off);
   open("editSheet");
 });
 $("eSave").onclick = ()=>{
@@ -714,6 +756,8 @@ $("eSave").onclick = ()=>{
   const r = dayRec(editK), reg = hm($("eH").value,$("eM").value);
   r.segs = []; r.manual = reg; r.reg = reg; r.ot = hm($("oH").value,$("oM").value);
   r.planned = r.planned || S.regular*HOUR; r.asked = true;
+  if($("eOff").checked){ r.off = true; if(!reg){ r.manual = r.reg = r.planned; } }
+  else { delete r.off; delete r.offPlan; }
   save(); close("editSheet"); lastMode="x"; syncWake(); render();
 };
 $("eDel").onclick = ()=>{
@@ -754,15 +798,43 @@ function renderLoves(){
     const b = document.createElement("button"); b.className = "heart"; b.innerHTML = HEART;
     b.setAttribute("aria-label", "وصلتني الرسالة");
     b.onclick = () => heartLove(m.id, card);
-    card.append(p, b); box.appendChild(card);
+    const r = document.createElement("button"); r.className = "reply"; r.textContent = "رد";
+    r.onclick = () => askReply(m, card);
+    const btns = document.createElement("div"); btns.className = "love-btns"; btns.append(b, r);
+    card.append(p, btns); box.appendChild(card);
   });
 }
-function heartLove(id, card){
+function heartLove(id, card, extra){
   loves = loves.filter(m => m.id !== id);
   card.classList.add("gone");
   if(navigator.vibrate) navigator.vibrate(15);
-  rest("dawam_messages?id=eq."+id, {method:"PATCH", body:JSON.stringify({hearted_at:new Date().toISOString()})}).catch(()=>{});
+  const now = new Date().toISOString();
+  rest("dawam_messages?id=eq."+id, {method:"PATCH", body:JSON.stringify(Object.assign({hearted_at:now}, extra))}).catch(()=>{});
   setTimeout(() => card.remove(), 900);
+}
+/* her reply goes back to admin.html and closes the task like the heart does */
+let replyTo = null;
+function askReply(m, card){
+  replyTo = {m, card}; $("rMsg").textContent = m.body; $("rText").value = "";
+  open("replySheet"); setTimeout(() => $("rText").focus(), 50);
+}
+$("rSend").onclick = () => {
+  const txt = $("rText").value.trim(); if(!txt || !replyTo) return;
+  close("replySheet");
+  heartLove(replyTo.m.id, replyTo.card, {reply:txt, replied_at:new Date().toISOString()});
+  replyTo = null;
+};
+
+/* ===== Day off: counts her regular hours, and he sees what she plans ===== */
+function askOff(){ $("offPlan").value = ""; open("offSheet"); }
+$("offGo").onclick = () => {
+  const k = dkey(new Date()), d = dayRec(k), p = S.regular*HOUR;
+  Object.assign(d, {off:true, offPlan:$("offPlan").value.trim(), planned:p, segs:[], manual:p, reg:p, ot:0, asked:true});
+  close("offSheet"); setNote("off", true); lastMode = "x"; render();
+};
+function cancelOff(){
+  if(!confirm("تلغين الأوف لليوم؟")) return;
+  delete S.days[dkey(new Date())]; save(); lastMode = "x"; render();
 }
 
 /* ===== Confetti for a full day ===== */
