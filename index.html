@@ -899,45 +899,127 @@ function cancelOff(){
   delete S.days[dkey(new Date())]; save(); lastMode = "x"; render();
 }
 
-/* ===== Photo card from Hama (admin.html): photo, piano, caption, her reply ===== */
+/* ===== Music player: audio files or a YouTube link (sound only), with a start/end time ===== */
 const WM = "https://upload.wikimedia.org/wikipedia/commons/";
-const TRACKS = {
+const TRACK_SRC = {
   chopin: [WM+"transcoded/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg.mp3", WM+"5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg"],
   satie: [WM+"2/2a/Gymnopedie_No._1_(ISRC_USUAN1100787).mp3"],
   debussy: [WM+"transcoded/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg.mp3", WM+"8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg"],
   chopin27: [WM+"transcoded/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg.mp3", WM+"4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg"]
 };
-let card = null, audio = null, fadeT = null, petalT = null;
+let ytApi = null;
+function loadYT(){
+  if(ytApi) return ytApi;
+  ytApi = new Promise(res => {
+    if(window.YT && YT.Player) return res();
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev && prev(); res(); };
+    const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(s);
+  });
+  return ytApi;
+}
+/* the YouTube player has to be ready before the tap, so prepare() early and play() inside the tap */
+function makeMusic(onState){
+  let kind = null, a = null, yt = null, ytReady = false, want = false, cfg = {start:0, end:0}, fadeT = null, vol = 0, key = "";
+  const setVol = v => { vol = v; if(kind==="a" && a) a.volume = v; if(kind==="yt" && yt && ytReady) yt.setVolume(Math.round(v*100)); };
+  function fade(to, ms, done){
+    clearInterval(fadeT); const from = vol, steps = 25; let n = 0;
+    fadeT = setInterval(() => { n++; setVol(from + (to-from)*n/steps); if(n>=steps){ clearInterval(fadeT); done && done(); } }, ms/steps);
+  }
+  function teardown(){
+    clearInterval(fadeT); want = false;
+    if(a){ a.pause(); a.removeAttribute("src"); a = null; }
+    if(yt){ try{ yt.destroy(); }catch(e){} yt = null; }
+    ytReady = false; kind = null;
+  }
+  function prepare(track, start, end){
+    const k = [track, start, end].join("|"); if(k === key && kind) return !!kind;
+    teardown(); key = k; cfg = {start: +start || 0, end: +end || 0};
+    if(!track) return false;
+    if(track.startsWith("yt:")){
+      kind = "yt";
+      let host = document.getElementById("ytHost");
+      if(!host){ host = document.createElement("div"); host.id = "ytHost"; host.setAttribute("aria-hidden","true");
+        host.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;overflow:hidden;z-index:-1";
+        document.body.appendChild(host); }
+      host.innerHTML = '<div id="ytPlayer"></div>';
+      loadYT().then(() => {
+        if(kind !== "yt" || key !== k) return;
+        const pv = {controls:0, playsinline:1, disablekb:1, rel:0};
+        if(cfg.start) pv.start = cfg.start; if(cfg.end) pv.end = cfg.end;
+        yt = new YT.Player("ytPlayer", {width:2, height:2, videoId:track.slice(3), playerVars:pv, events:{
+          onReady: () => { ytReady = true; yt.setVolume(0); if(want) startYT(); },
+          onStateChange: e => {
+            if(e.data === YT.PlayerState.ENDED && want){ yt.seekTo(cfg.start, true); yt.playVideo(); }
+            if(e.data === YT.PlayerState.PLAYING) onState && onState(true);
+          },
+          onError: () => { onState && onState(false, "yt"); }
+        }});
+      });
+      return true;
+    }
+    const list = /^https?:\/\//.test(track) ? [track] : (TRACK_SRC[track] || []);
+    if(!list.length) return false;
+    kind = "a"; let i = 0; const el = a = new Audio(); el.preload = "auto";
+    el.onerror = () => { if(a===el && ++i < list.length){ el.src = list[i]; if(want) startA(); } };
+    el.ontimeupdate = () => { if(cfg.end && el.currentTime >= cfg.end) el.currentTime = cfg.start; };
+    el.onended = () => { if(want){ el.currentTime = cfg.start; el.play().catch(()=>{}); } };
+    el.src = list[0];
+    return true;
+  }
+  function startA(){
+    const el = a; if(!el) return;
+    const seek = () => { if(cfg.start && el.currentTime < cfg.start) el.currentTime = cfg.start; };
+    if(el.readyState >= 1) seek(); else el.addEventListener("loadedmetadata", seek, {once:true});
+    setVol(0);
+    el.play().then(() => { onState && onState(true); fade(.7, 2500); }).catch(() => onState && onState(false));
+  }
+  function startYT(){ setVol(0); yt.playVideo(); fade(.7, 2500); }
+  return {
+    prepare,
+    play(){ want = true; if(kind==="a") startA(); else if(kind==="yt" && ytReady) startYT(); return !!kind; },
+    stop(now){
+      want = false; clearInterval(fadeT); onState && onState(false);
+      const k = kind, el = a, p = yt;
+      const halt = () => { if(k==="a" && el) el.pause(); if(k==="yt" && p && ytReady) p.pauseVideo(); };
+      if(now) halt(); else fade(0, 900, halt);
+    },
+    playing: () => want,
+    reset: () => { teardown(); key = ""; }
+  };
+}
+/* "1:20", "80" or "" → seconds */
+function toSec(v){
+  v = String(v||"").trim().replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace("：",":");
+  if(!v) return 0;
+  const p = v.split(":").map(Number); if(p.some(isNaN)) return NaN;
+  return p.reduce((s,x) => s*60 + x, 0);
+}
+const fmtSec = s => s ? Math.floor(s/60) + ":" + String(s%60).padStart(2,"0") : "";
+function ytId(url){
+  url = String(url||"").trim();
+  const m = url.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/) || url.match(/^([\w-]{11})$/);
+  return m ? m[1] : "";
+}
+function ytStart(url){
+  const m = String(url||"").match(/[?&](?:t|start)=(\d+h)?(\d+m)?(\d+)s?/);
+  return m ? (parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3])) : 0;
+}
+
+/* ===== Photo card from Hama (admin.html): photo, music, caption, her reply ===== */
+let card = null, petalT = null;
+const music = makeMusic(on => $("cardMus").classList.toggle("on", !!on));
 function loadCard(){
   if(!syncOn()) return Promise.resolve();
   return rpc("dawam_card_current", {}).then(c => {
-    if(!c || !c.id){ card = null; $("cardBtn").hidden = true; return; }
+    if(!c || !c.id){ card = null; $("cardBtn").hidden = true; music.reset(); return; }
+    const fresh = !card || card.id !== c.id;
     card = c; $("cardBtn").hidden = false;
+    if(fresh && !$("cardSheet").classList.contains("open")) $("cardMus").hidden = !music.prepare(c.track, c.start, c.end);
     if(S.cardSeen !== c.id && !$("cardSheet").classList.contains("open")){
       $("cardEnv").hidden = false; $("cardBox").hidden = true; open("cardSheet");
     }
   }).catch(()=>{});
-}
-const trackSrcs = t => !t ? [] : /^https?:\/\//.test(t) ? [t] : (TRACKS[t] || []);
-function fadeTo(target, ms, done){
-  clearInterval(fadeT); if(!audio){ done && done(); return; }
-  const a = audio, from = a.volume, steps = 25; let n = 0;
-  fadeT = setInterval(()=>{ n++; a.volume = Math.max(0, Math.min(1, from + (target-from)*n/steps)); if(n>=steps){ clearInterval(fadeT); done && done(); } }, ms/steps);
-}
-function stopMusic(now){
-  $("cardMus").classList.remove("on");
-  if(!audio) return; const a = audio;
-  if(now){ clearInterval(fadeT); a.pause(); audio = null; return; }
-  fadeTo(0, 900, ()=>{ a.pause(); if(audio===a) audio = null; });
-}
-function playMusic(){
-  stopMusic(true);
-  const list = trackSrcs(card && card.track);
-  $("cardMus").hidden = !list.length; if(!list.length) return;
-  let i = 0; const a = audio = new Audio(); a.loop = true; a.volume = 0;
-  const go = () => a.play().then(()=>{ $("cardMus").classList.add("on"); fadeTo(0.7, 2500); }).catch(()=>{});
-  a.onerror = () => { if(audio===a && ++i < list.length){ a.src = list[i]; go(); } };
-  a.src = list[0]; go();
 }
 function petals(on){
   clearInterval(petalT); if(!on || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -957,15 +1039,17 @@ function showCard(){
   $("cardEnv").hidden = true; $("cardBox").hidden = false;
   $("cardImg").src = card.photo; $("cardCap").textContent = card.caption;
   $("cardWho").textContent = "— " + FROM + " · " + new Date(card.at).toLocaleString("ar-IQ",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
-  renderCardReply(); open("cardSheet"); playMusic(); petals(true);
+  renderCardReply(); open("cardSheet");
+  $("cardMus").hidden = !music.prepare(card.track, card.start, card.end);
+  music.play(); petals(true);
   if(S.cardSeen !== card.id){ S.cardSeen = card.id; save(); rpc("dawam_card_seen", {p_id:card.id}).catch(()=>{}); }
 }
-function closeCard(){ stopMusic(false); petals(false); close("cardSheet"); }
+function closeCard(){ music.stop(false); petals(false); close("cardSheet"); }
 $("cardOpen").onclick = showCard;
 $("cardBtn").onclick = showCard;
 $("cardClose").onclick = closeCard;
 $("cardClose2").onclick = closeCard;
-$("cardMus").onclick = () => { if(audio && !audio.paused) stopMusic(false); else playMusic(); };
+$("cardMus").onclick = () => { if(music.playing()) music.stop(false); else music.play(); };
 $("cardSend").onclick = () => {
   const t = $("cardReply").value.trim(); if(!t || !card) return;
   const b = $("cardSend"); b.disabled = true; b.textContent = "جاي يندز…";
@@ -990,7 +1074,7 @@ function confetti(){
 
 /* ===== Loop ===== */
 document.addEventListener("visibilitychange", ()=>{
-  if(document.hidden){ if(pushTimer) push(true); if(audio) stopMusic(true); return; }
+  if(document.hidden){ if(pushTimer) push(true); if(music.playing()) music.stop(true); return; }
   pull().then(()=>{ check(); render(); syncWake(); });
   loadLoves(); loadCard();
 });

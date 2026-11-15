@@ -88,5 +88,7 @@ alter table public.dawam_cards enable row level security;
 create table if not exists public.dawam_secret (id int primary key check (id=1), key text not null);
 alter table public.dawam_secret enable row level security;
 -- functions: dawam_card_current(), dawam_card_seen(id), dawam_card_reply(id, text),
---            dawam_card_add(key, photo, caption, track), dawam_card_list(key), dawam_card_delete(key, id)
+--            dawam_card_add(key, photo, caption, track, start, end), dawam_card_list(key), dawam_card_delete(key, id)
+-- track: chopin / debussy / satie / chopin27, or "yt:VIDEOID" for a YouTube link (sound only); track_start / track_end in seconds
+-- (migration "dawam_cards_music_timing")
 -- (applied as migration "dawam_cards" on the Supabase project)

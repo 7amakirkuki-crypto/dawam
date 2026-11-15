@@ -91,6 +91,8 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
 .key{display:flex;gap:8px;margin-top:8px}
 .key input{flex:1;min-height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;padding:0 12px}
 .key button{width:auto;margin:0;padding:0 16px}
+.field-in{display:block;width:100%;min-height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;padding:0 12px}
+.key .field-in{flex:1;min-width:0}
 .cards .msg p b{display:block;font-weight:600;font-size:.8rem;color:var(--muted)}
 </style>
 </head>
@@ -117,6 +119,18 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
     <div id="cardForm">
       <label class="pick" id="pick" style="position:relative"><span id="pickTxt">📷 دوس هنا واختار صورة</span><input type="file" id="photo" accept="image/*"></label>
       <div class="tracks" id="tracks" role="radiogroup" aria-label="الموسيقى"></div>
+      <div id="ytBox" hidden style="margin-bottom:12px">
+        <label for="ytUrl" style="display:block;font-weight:600;margin-bottom:6px">رابط يوتيوب</label>
+        <input id="ytUrl" class="field-in" inputmode="url" autocomplete="off" placeholder="https://youtu.be/…">
+      </div>
+      <div id="timeBox" style="margin-bottom:12px">
+        <p style="font-weight:600;margin:0 0 6px">من وين تبدي ولوين تخلص؟ <span style="font-weight:400;color:var(--muted);font-size:.85rem">(اختياري)</span></p>
+        <div class="key" style="margin:0">
+          <input id="tStart" class="field-in" inputmode="numeric" placeholder="تبدي من  0:45">
+          <input id="tEnd" class="field-in" inputmode="numeric" placeholder="تخلص عند  2:10">
+        </div>
+        <p style="margin:6px 0 0;color:var(--muted);font-size:.8rem">المقطع يعيد نفسه من البداية اللي تحددها لحد ما تسكّر البطاقة.</p>
+      </div>
       <label for="cap" style="display:block;font-weight:600;margin-bottom:6px">شنو تكتبلها؟</label>
       <textarea id="cap" maxlength="1000" placeholder="مثلاً: تذكرين هاي الصورة؟ من يومها وأنا أحبج أكثر…"></textarea>
       <button class="btn" id="cardSend">دز البطاقة 💌</button>
@@ -240,20 +254,129 @@ function loadHer(){
     .catch(() => { $("lSub").textContent = "ما گدرت أجيب حالتها، تأكد من الإنترنت"; });
 }
 
-/* ===== Photo card with piano music ===== */
+/* ===== Music player: audio files or a YouTube link (sound only), with a start/end time ===== */
+const WM = "https://upload.wikimedia.org/wikipedia/commons/";
+const TRACK_SRC = {
+  chopin: [WM+"transcoded/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg.mp3", WM+"5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg"],
+  satie: [WM+"2/2a/Gymnopedie_No._1_(ISRC_USUAN1100787).mp3"],
+  debussy: [WM+"transcoded/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg.mp3", WM+"8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg"],
+  chopin27: [WM+"transcoded/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg.mp3", WM+"4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg"]
+};
+let ytApi = null;
+function loadYT(){
+  if(ytApi) return ytApi;
+  ytApi = new Promise(res => {
+    if(window.YT && YT.Player) return res();
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev && prev(); res(); };
+    const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(s);
+  });
+  return ytApi;
+}
+/* the YouTube player has to be ready before the tap, so prepare() early and play() inside the tap */
+function makeMusic(onState){
+  let kind = null, a = null, yt = null, ytReady = false, want = false, cfg = {start:0, end:0}, fadeT = null, vol = 0, key = "";
+  const setVol = v => { vol = v; if(kind==="a" && a) a.volume = v; if(kind==="yt" && yt && ytReady) yt.setVolume(Math.round(v*100)); };
+  function fade(to, ms, done){
+    clearInterval(fadeT); const from = vol, steps = 25; let n = 0;
+    fadeT = setInterval(() => { n++; setVol(from + (to-from)*n/steps); if(n>=steps){ clearInterval(fadeT); done && done(); } }, ms/steps);
+  }
+  function teardown(){
+    clearInterval(fadeT); want = false;
+    if(a){ a.pause(); a.removeAttribute("src"); a = null; }
+    if(yt){ try{ yt.destroy(); }catch(e){} yt = null; }
+    ytReady = false; kind = null;
+  }
+  function prepare(track, start, end){
+    const k = [track, start, end].join("|"); if(k === key && kind) return !!kind;
+    teardown(); key = k; cfg = {start: +start || 0, end: +end || 0};
+    if(!track) return false;
+    if(track.startsWith("yt:")){
+      kind = "yt";
+      let host = document.getElementById("ytHost");
+      if(!host){ host = document.createElement("div"); host.id = "ytHost"; host.setAttribute("aria-hidden","true");
+        host.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;overflow:hidden;z-index:-1";
+        document.body.appendChild(host); }
+      host.innerHTML = '<div id="ytPlayer"></div>';
+      loadYT().then(() => {
+        if(kind !== "yt" || key !== k) return;
+        const pv = {controls:0, playsinline:1, disablekb:1, rel:0};
+        if(cfg.start) pv.start = cfg.start; if(cfg.end) pv.end = cfg.end;
+        yt = new YT.Player("ytPlayer", {width:2, height:2, videoId:track.slice(3), playerVars:pv, events:{
+          onReady: () => { ytReady = true; yt.setVolume(0); if(want) startYT(); },
+          onStateChange: e => {
+            if(e.data === YT.PlayerState.ENDED && want){ yt.seekTo(cfg.start, true); yt.playVideo(); }
+            if(e.data === YT.PlayerState.PLAYING) onState && onState(true);
+          },
+          onError: () => { onState && onState(false, "yt"); }
+        }});
+      });
+      return true;
+    }
+    const list = /^https?:\/\//.test(track) ? [track] : (TRACK_SRC[track] || []);
+    if(!list.length) return false;
+    kind = "a"; let i = 0; const el = a = new Audio(); el.preload = "auto";
+    el.onerror = () => { if(a===el && ++i < list.length){ el.src = list[i]; if(want) startA(); } };
+    el.ontimeupdate = () => { if(cfg.end && el.currentTime >= cfg.end) el.currentTime = cfg.start; };
+    el.onended = () => { if(want){ el.currentTime = cfg.start; el.play().catch(()=>{}); } };
+    el.src = list[0];
+    return true;
+  }
+  function startA(){
+    const el = a; if(!el) return;
+    const seek = () => { if(cfg.start && el.currentTime < cfg.start) el.currentTime = cfg.start; };
+    if(el.readyState >= 1) seek(); else el.addEventListener("loadedmetadata", seek, {once:true});
+    setVol(0);
+    el.play().then(() => { onState && onState(true); fade(.7, 2500); }).catch(() => onState && onState(false));
+  }
+  function startYT(){ setVol(0); yt.playVideo(); fade(.7, 2500); }
+  return {
+    prepare,
+    play(){ want = true; if(kind==="a") startA(); else if(kind==="yt" && ytReady) startYT(); return !!kind; },
+    stop(now){
+      want = false; clearInterval(fadeT); onState && onState(false);
+      const k = kind, el = a, p = yt;
+      const halt = () => { if(k==="a" && el) el.pause(); if(k==="yt" && p && ytReady) p.pauseVideo(); };
+      if(now) halt(); else fade(0, 900, halt);
+    },
+    playing: () => want,
+    reset: () => { teardown(); key = ""; }
+  };
+}
+/* "1:20", "80" or "" → seconds */
+function toSec(v){
+  v = String(v||"").trim().replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace("：",":");
+  if(!v) return 0;
+  const p = v.split(":").map(Number); if(p.some(isNaN)) return NaN;
+  return p.reduce((s,x) => s*60 + x, 0);
+}
+const fmtSec = s => s ? Math.floor(s/60) + ":" + String(s%60).padStart(2,"0") : "";
+function ytId(url){
+  url = String(url||"").trim();
+  const m = url.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/) || url.match(/^([\w-]{11})$/);
+  return m ? m[1] : "";
+}
+function ytStart(url){
+  const m = String(url||"").match(/[?&](?:t|start)=(\d+h)?(\d+m)?(\d+)s?/);
+  return m ? (parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3])) : 0;
+}
+
+/* ===== Photo card with music ===== */
 const TRACKS = [
-  {id:"chopin", name:"شوبان — نوكتورن Op.9 رقم 2", note:"الأشهر والأكثر رومانسية، دافي وحالم",
-   src:["https://upload.wikimedia.org/wikipedia/commons/transcoded/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg.mp3","https://upload.wikimedia.org/wikipedia/commons/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg"]},
-  {id:"debussy", name:"ديبوسي — الفتاة ذات الشعر الكتّاني", note:"ناعمة وقصيرة، مثل همسة",
-   src:["https://upload.wikimedia.org/wikipedia/commons/transcoded/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg.mp3","https://upload.wikimedia.org/wikipedia/commons/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg"]},
-  {id:"satie", name:"ساتي — جمنوبيدي رقم 1", note:"هادية جداً، جو موراكامي بالضبط",
-   src:["https://upload.wikimedia.org/wikipedia/commons/2/2a/Gymnopedie_No._1_(ISRC_USUAN1100787).mp3"]},
-  {id:"chopin27", name:"شوبان — نوكتورن Op.27 رقم 2", note:"أعمق وأطول، للبطاقات الخاصة",
-   src:["https://upload.wikimedia.org/wikipedia/commons/transcoded/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg.mp3","https://upload.wikimedia.org/wikipedia/commons/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg"]},
-  {id:"", name:"بدون موسيقى", note:"", src:[]}
+  {id:"chopin", name:"شوبان — نوكتورن Op.9 رقم 2", note:"الأشهر والأكثر رومانسية، دافي وحالم"},
+  {id:"debussy", name:"ديبوسي — الفتاة ذات الشعر الكتّاني", note:"ناعمة وقصيرة، مثل همسة"},
+  {id:"satie", name:"ساتي — جمنوبيدي رقم 1", note:"هادية جداً، جو موراكامي بالضبط"},
+  {id:"chopin27", name:"شوبان — نوكتورن Op.27 رقم 2", note:"أعمق وأطول، للبطاقات الخاصة"},
+  {id:"yt", name:"رابط يوتيوب ▶️", note:"الصق رابط أي أغنية، ويطلعلها صوتها بس"},
+  {id:"", name:"بدون موسيقى", note:""}
 ];
 const KEY_LS = "dawam-card-key";
-let cardKey = "", photoData = "", track = "chopin", preview = null, previewId = null;
+let cardKey = "", photoData = "", track = "chopin";
+const preview = makeMusic((on, err) => {
+  document.querySelectorAll(".play").forEach(b => b.textContent = "▶");
+  if(on){ const b = document.querySelector(".trk.on .play"); if(b) b.textContent = "⏸"; }
+  if(err === "yt") $("cState").textContent = "هذا الفيديو صاحبه ما يسمح يشتغل برا يوتيوب، جرب رابط ثاني";
+});
 try{
   const m = location.hash.match(/k=([\w-]{16,})/);
   if(m){ localStorage.setItem(KEY_LS, m[1]); history.replaceState(null, "", location.pathname); }
@@ -262,27 +385,56 @@ try{
 function keyUI(){ $("keyBox").hidden = !!cardKey; $("cardForm").hidden = !cardKey; }
 $("keySave").onclick = () => { cardKey = $("keyIn").value.trim(); try{ localStorage.setItem(KEY_LS, cardKey); }catch(e){} keyUI(); loadCards(); };
 
-function stopPreview(){ if(preview){ preview.pause(); preview = null; } previewId = null; document.querySelectorAll(".play").forEach(b => b.textContent = "▶"); }
-function playPreview(t, btn){
-  if(previewId === t.id){ stopPreview(); return; }
-  stopPreview(); let i = 0; const a = preview = new Audio(t.src[0]); previewId = t.id;
-  a.onerror = () => { if(preview===a && ++i < t.src.length){ a.src = t.src[i]; a.play().catch(()=>{}); } };
-  a.play().then(() => btn.textContent = "⏸").catch(() => { $("cState").textContent = "ما اشتغلت الموسيقى، جرب مرة ثانية"; });
+/* what will be saved: track id ("yt:ID" for YouTube) and the times */
+function chosen(){
+  const st = toSec($("tStart").value), en = toSec($("tEnd").value);
+  let t = track;
+  if(track === "yt"){ const id = ytId($("ytUrl").value); t = id ? "yt:"+id : ""; }
+  return {track:t, start:st, end:en};
 }
+function timesOk(c){
+  if(isNaN(c.start) || isNaN(c.end)){ $("cState").textContent = "اكتب الوقت مثل 1:20"; return false; }
+  if(c.end && c.end <= c.start){ $("cState").textContent = "وقت النهاية لازم يكون بعد البداية"; return false; }
+  return true;
+}
+function prep(){ const c = chosen(); if(!isNaN(c.start) && !isNaN(c.end)) preview.prepare(c.track, c.start, c.end); }
 function renderTracks(){
   const box = $("tracks"); box.innerHTML = "";
   TRACKS.forEach(t => {
     const row = document.createElement("div"); row.className = "trk" + (track===t.id ? " on" : "");
     const r = document.createElement("input"); r.type = "radio"; r.name = "trk"; r.id = "trk-"+(t.id||"none"); r.checked = track===t.id;
-    r.onchange = () => { track = t.id; renderTracks(); };
+    r.onchange = () => { preview.stop(true); track = t.id; renderTracks(); prep(); };
     const l = document.createElement("label"); l.htmlFor = r.id;
     const b = document.createElement("b"); b.textContent = t.name; l.appendChild(b);
     if(t.note){ const sp = document.createElement("span"); sp.textContent = t.note; l.appendChild(sp); }
     row.append(r, l);
-    if(t.src.length){ const pb = document.createElement("button"); pb.type = "button"; pb.className = "play"; pb.textContent = previewId===t.id ? "⏸" : "▶"; pb.setAttribute("aria-label","اسمع "+t.name); pb.onclick = () => playPreview(t, pb); row.appendChild(pb); }
+    if(t.id){
+      const pb = document.createElement("button"); pb.type = "button"; pb.className = "play"; pb.textContent = "▶"; pb.setAttribute("aria-label","اسمع "+t.name);
+      pb.onclick = () => {
+        $("cState").textContent = "";
+        if(track !== t.id){ track = t.id; renderTracks(); }
+        if(preview.playing()){ preview.stop(true); return; }
+        const c = chosen(); if(!timesOk(c)) return;
+        if(!c.track){ $("cState").textContent = "الصق رابط يوتيوب أول"; return; }
+        preview.prepare(c.track, c.start, c.end);
+        preview.play();
+        if(c.track.startsWith("yt:")) $("cState").textContent = "إذا ما اشتغل، دوس ▶ مرة ثانية بعد ثانية";
+      };
+      row.appendChild(pb);
+    }
     box.appendChild(row);
   });
+  $("ytBox").hidden = track !== "yt";
+  $("timeBox").hidden = !track;
 }
+$("ytUrl").addEventListener("change", () => {
+  const u = $("ytUrl").value;
+  if(u && !ytId(u)){ $("cState").textContent = "هذا مو رابط يوتيوب صحيح"; return; }
+  $("cState").textContent = "";
+  const st = ytStart(u); if(st && !$("tStart").value) $("tStart").value = fmtSec(st);
+  preview.stop(true); prep();
+});
+["tStart","tEnd"].forEach(id => $(id).addEventListener("change", () => { preview.stop(true); prep(); }));
 function shrink(file){
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file), img = new Image();
@@ -308,11 +460,13 @@ $("photo").onchange = e => {
   }).catch(() => { $("pickTxt").textContent = "ما گدرت أفتح الصورة، اختار وحدة ثانية"; });
 };
 $("cardSend").onclick = () => {
-  const cap = $("cap").value.trim();
+  const cap = $("cap").value.trim(), c = chosen();
   if(!photoData){ $("cState").textContent = "اختار صورة أول"; return; }
   if(!cap){ $("cState").textContent = "اكتبلها شي ويا الصورة"; return; }
-  $("cardSend").disabled = true; $("cState").textContent = "جاي يندز…"; stopPreview();
-  rest("rpc/dawam_card_add", {method:"POST", body:JSON.stringify({p_key:cardKey, p_photo:photoData, p_caption:cap, p_track:track})})
+  if(track === "yt" && !c.track){ $("cState").textContent = "الصق رابط يوتيوب صحيح أو اختار مقطوعة ثانية"; return; }
+  if(!timesOk(c)) return;
+  $("cardSend").disabled = true; $("cState").textContent = "جاي يندز…"; preview.stop(true);
+  rest("rpc/dawam_card_add", {method:"POST", body:JSON.stringify({p_key:cardKey, p_photo:photoData, p_caption:cap, p_track:c.track, p_start:c.start||null, p_end:c.end||null})})
     .then(() => {
       $("cState").textContent = "وصلت 💌 راح تطلعلها أول ما تفتح دوامي";
       $("cap").value = ""; photoData = ""; $("pick").querySelector("img")?.remove();
@@ -322,7 +476,12 @@ $("cardSend").onclick = () => {
     .catch(e => { $("cState").textContent = String(e.message).startsWith("4") ? "المفتاح غلط أو الصورة كبيرة" : "ما وصلت، جرب مرة ثانية"; })
     .finally(() => $("cardSend").disabled = false);
 };
-const trackName = id => (TRACKS.find(t => t.id === (id||"")) || {name:""}).name;
+function trackLabel(c){
+  const t = c.track || "";
+  const name = t.startsWith("yt:") ? "يوتيوب" : (TRACKS.find(x => x.id === t) || {name:"بدون موسيقى"}).name;
+  const range = c.start || c.end ? " · " + (fmtSec(c.start) || "0:00") + (c.end ? " ← " + fmtSec(c.end) : "") : "";
+  return (t ? "🎹 " : "") + name + range;
+}
 function loadCards(){
   if(!cardKey) { $("cardList").innerHTML = ""; return Promise.resolve(); }
   return rest("rpc/dawam_card_list", {method:"POST", body:JSON.stringify({p_key:cardKey})}).then(rows => {
@@ -331,7 +490,7 @@ function loadCards(){
     rows.forEach((c, i) => {
       const row = document.createElement("div"); row.className = "msg" + (c.seen ? " seen" : "");
       const p = document.createElement("p");
-      const tag = document.createElement("b"); tag.textContent = (i===0 ? "الحالية · " : "") + "🎹 " + trackName(c.track); p.appendChild(tag);
+      const tag = document.createElement("b"); tag.textContent = (i===0 ? "الحالية · " : "") + trackLabel(c); p.appendChild(tag);
       p.appendChild(document.createTextNode(c.caption));
       const s = document.createElement("small"); s.textContent = c.seen ? "👀 شافتها " + when(c.seen) : "انبعثت " + when(c.at) + " · بعدها ما شافتها"; p.appendChild(s);
       if(c.reply){ const r = document.createElement("div"); r.className = "reply-box"; const h = document.createElement("b"); h.textContent = "ردها · " + when(c.replied); r.append(h, document.createTextNode(c.reply)); p.appendChild(r); }
@@ -341,7 +500,7 @@ function loadCards(){
     });
   }).catch(() => { $("cardList").innerHTML = '<p class="empty">ما گدرت أجيب البطاقات، تأكد من المفتاح والإنترنت.</p>'; });
 }
-keyUI(); renderTracks(); loadCards(); setInterval(loadCards, 30000);
+keyUI(); renderTracks(); prep(); loadCards(); setInterval(loadCards, 30000);
 
 document.addEventListener("visibilitychange", () => { if(!document.hidden){ load(); loadHer(); } });
 load(); loadHer();
