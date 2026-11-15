@@ -263,7 +263,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
 <div class="scrim" id="cardSheet" role="dialog" aria-modal="true" aria-label="بطاقة من حمه">
   <div class="env" id="cardEnv">
     <div class="seal">💌</div>
-    <h3>عندج بطاقة من حمه</h3>
+    <h3 id="cardEnvT">عندج بطاقة من حمه</h3>
     <p>شغّلي الصوت، وافتحيها على راحتج</p>
     <button class="btn" id="cardOpen">افتحي البطاقة</button>
   </div>
@@ -1092,7 +1092,12 @@ function showCard(){
 }
 function closeCard(){ music.stop(false); petals(false); close("cardSheet"); music.overlay(null); }
 $("cardOpen").onclick = showCard;
-$("cardBtn").onclick = showCard;
+/* reopening: YouTube needs her tap inside the player, so go through the envelope button again */
+$("cardBtn").onclick = () => {
+  if(!card) return;
+  if(!music.isYT()) return showCard();
+  $("cardEnv").hidden = false; $("cardBox").hidden = true; open("cardSheet"); setTimeout(placeYT, 300);
+};
 $("cardClose").onclick = closeCard;
 $("cardClose2").onclick = closeCard;
 $("cardMus").onclick = () => { if(music.playing()) music.stop(false); else music.play(); setTimeout(placeYT, 300); };
