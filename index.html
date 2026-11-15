@@ -918,9 +918,11 @@ function loadYT(){
   });
   return ytApi;
 }
-/* the YouTube player has to be ready before the tap, so prepare() early and play() inside the tap */
-function makeMusic(onState){
-  let kind = null, a = null, yt = null, ytReady = false, want = false, cfg = {start:0, end:0}, fadeT = null, vol = 0, key = "";
+/* Phones only let a YouTube player start with sound when the tap lands inside the player itself,
+   so the hidden player can be laid over a button (overlay) to catch that first tap. */
+function makeMusic(onState, opts){
+  opts = opts || {};
+  let kind = null, a = null, yt = null, ytReady = false, want = false, cfg = {start:0, end:0}, fadeT = null, vol = 0, key = "", ytFailed = false, over = null;
   const setVol = v => { vol = v; if(kind==="a" && a) a.volume = v; if(kind==="yt" && yt && ytReady) yt.setVolume(Math.round(v*100)); };
   function fade(to, ms, done){
     clearInterval(fadeT); const from = vol, steps = 25; let n = 0;
@@ -930,30 +932,46 @@ function makeMusic(onState){
     clearInterval(fadeT); want = false;
     if(a){ a.pause(); a.removeAttribute("src"); a = null; }
     if(yt){ try{ yt.destroy(); }catch(e){} yt = null; }
-    ytReady = false; kind = null;
+    ytReady = false; kind = null; ytFailed = false; hideOver();
   }
+  function hostEl(){
+    if(opts.hostId) return document.getElementById(opts.hostId);
+    let host = document.getElementById("ytHost");
+    if(!host){ host = document.createElement("div"); host.id = "ytHost"; host.setAttribute("aria-hidden","true"); document.body.appendChild(host); }
+    return host;
+  }
+  const HIDDEN = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;overflow:hidden;z-index:-1";
+  function placeOver(){
+    if(!over || opts.visible) return;
+    const r = over.getBoundingClientRect(), host = hostEl();
+    host.style.cssText = "position:fixed;left:"+r.left+"px;top:"+r.top+"px;width:"+r.width+"px;height:"+r.height+"px;opacity:.01;overflow:hidden;z-index:80;border-radius:999px";
+    if(yt && ytReady) try{ yt.setSize(Math.ceil(r.width), Math.ceil(r.height)); }catch(e){}
+  }
+  function hideOver(){ over = null; if(!opts.visible && document.getElementById("ytHost")) document.getElementById("ytHost").style.cssText = HIDDEN; }
+  addEventListener("resize", placeOver); addEventListener("scroll", placeOver, true);
   function prepare(track, start, end){
     const k = [track, start, end].join("|"); if(k === key && kind) return !!kind;
     teardown(); key = k; cfg = {start: +start || 0, end: +end || 0};
     if(!track) return false;
     if(track.startsWith("yt:")){
       kind = "yt";
-      let host = document.getElementById("ytHost");
-      if(!host){ host = document.createElement("div"); host.id = "ytHost"; host.setAttribute("aria-hidden","true");
-        host.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;overflow:hidden;z-index:-1";
-        document.body.appendChild(host); }
-      host.innerHTML = '<div id="ytPlayer"></div>';
+      const host = hostEl(); if(!opts.visible) host.style.cssText = HIDDEN;
+      const pid = "ytPlayer" + (opts.hostId || ""); host.innerHTML = '<div id="'+pid+'"></div>';
       loadYT().then(() => {
         if(kind !== "yt" || key !== k) return;
-        const pv = {controls:0, playsinline:1, disablekb:1, rel:0};
+        const pv = {controls: opts.visible ? 1 : 0, playsinline:1, disablekb: opts.visible ? 0 : 1, rel:0};
         if(cfg.start) pv.start = cfg.start; if(cfg.end) pv.end = cfg.end;
-        yt = new YT.Player("ytPlayer", {width:2, height:2, videoId:track.slice(3), playerVars:pv, events:{
-          onReady: () => { ytReady = true; yt.setVolume(0); if(want) startYT(); },
+        yt = new YT.Player(pid, {width: opts.visible ? "100%" : 2, height: opts.visible ? "100%" : 2, videoId:track.slice(3), playerVars:pv, events:{
+          onReady: () => { ytReady = true; if(!opts.visible) yt.setVolume(0); placeOver(); if(want) startYT(); opts.onReady && opts.onReady(); },
           onStateChange: e => {
-            if(e.data === YT.PlayerState.ENDED && want){ yt.seekTo(cfg.start, true); yt.playVideo(); }
-            if(e.data === YT.PlayerState.PLAYING) onState && onState(true);
+            if(e.data === YT.PlayerState.ENDED && (want || opts.visible)){ yt.seekTo(cfg.start, true); yt.playVideo(); }
+            if(e.data === YT.PlayerState.PLAYING){
+              if(!want){ want = true; if(!opts.visible){ vol = 0; yt.setVolume(0); fade(.7, 2500); } }
+              onState && onState(true);
+            }
+            if(e.data === YT.PlayerState.PAUSED && opts.visible){ want = false; onState && onState(false); }
           },
-          onError: () => { onState && onState(false, "yt"); }
+          onError: () => { ytFailed = true; hideOver(); onState && onState(false, "yt"); }
         }});
       });
       return true;
@@ -961,7 +979,7 @@ function makeMusic(onState){
     const list = /^https?:\/\//.test(track) ? [track] : (TRACK_SRC[track] || []);
     if(!list.length) return false;
     kind = "a"; let i = 0; const el = a = new Audio(); el.preload = "auto";
-    el.onerror = () => { if(a===el && ++i < list.length){ el.src = list[i]; if(want) startA(); } };
+    el.onerror = () => { if(a!==el) return; if(++i < list.length){ el.src = list[i]; if(want) startA(); } else { onState && onState(false, "a"); } };
     el.ontimeupdate = () => { if(cfg.end && el.currentTime >= cfg.end) el.currentTime = cfg.start; };
     el.onended = () => { if(want){ el.currentTime = cfg.start; el.play().catch(()=>{}); } };
     el.src = list[0];
@@ -974,7 +992,7 @@ function makeMusic(onState){
     setVol(0);
     el.play().then(() => { onState && onState(true); fade(.7, 2500); }).catch(() => onState && onState(false));
   }
-  function startYT(){ setVol(0); yt.playVideo(); fade(.7, 2500); }
+  function startYT(){ if(opts.visible){ yt.playVideo(); return; } setVol(0); yt.playVideo(); fade(.7, 2500); }
   return {
     prepare,
     play(){ want = true; if(kind==="a") startA(); else if(kind==="yt" && ytReady) startYT(); return !!kind; },
@@ -985,7 +1003,11 @@ function makeMusic(onState){
       if(now) halt(); else fade(0, 900, halt);
     },
     playing: () => want,
-    reset: () => { teardown(); key = ""; }
+    reset: () => { teardown(); key = ""; },
+    isYT: () => kind === "yt" && !ytFailed,
+    failed: () => ytFailed,
+    /* lay the hidden YouTube player over a button so her tap starts it; null puts it away */
+    overlay(el){ if(kind !== "yt" || ytFailed || !el){ hideOver(); return; } over = el; placeOver(); }
   };
 }
 /* "1:20", "80" or "" → seconds */
@@ -1001,6 +1023,14 @@ function ytId(url){
   const m = url.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/) || url.match(/^([\w-]{11})$/);
   return m ? m[1] : "";
 }
+/* share links → direct file links where the site allows it (Google Drive, Dropbox) */
+function directLink(url){
+  url = String(url||"").trim();
+  let m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
+  if(m) return "https://drive.google.com/uc?export=download&id=" + m[1];
+  if(/dropbox\.com\//.test(url)) return url.replace(/([?&])dl=0/, "$1raw=1").replace(/^(?!.*[?&](raw|dl)=1)(.*)$/, (x) => x + (x.includes("?") ? "&" : "?") + "raw=1");
+  return url;
+}
 function ytStart(url){
   const m = String(url||"").match(/[?&](?:t|start)=(\d+h)?(\d+m)?(\d+)s?/);
   return m ? (parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3])) : 0;
@@ -1008,7 +1038,23 @@ function ytStart(url){
 
 /* ===== Photo card from Hama (admin.html): photo, music, caption, her reply ===== */
 let card = null, petalT = null;
-const music = makeMusic(on => $("cardMus").classList.toggle("on", !!on));
+const music = makeMusic(on => {
+  $("cardMus").classList.toggle("on", !!on);
+  /* her tap landed inside the YouTube player over the envelope button: open the card */
+  if(on && !$("cardEnv").hidden && $("cardSheet").classList.contains("open")) showCard();
+  placeYT();
+}, {onReady: () => placeYT()});
+/* YouTube on phones needs her tap inside the player: lay it over the button she is about to tap */
+function placeYT(){
+  if(!music.isYT() || !$("cardSheet").classList.contains("open")) return music.overlay(null);
+  if(!$("cardEnv").hidden) return music.overlay($("cardOpen"));
+  music.overlay(music.playing() ? null : $("cardMus"));
+}
+/* if the tap went into the player but it did not start, still open the card */
+addEventListener("blur", () => setTimeout(() => {
+  if(document.activeElement && document.activeElement.tagName === "IFRAME" && !$("cardEnv").hidden && $("cardSheet").classList.contains("open"))
+    setTimeout(() => { if(!$("cardEnv").hidden) showCard(); }, 1200);
+}, 0));
 function loadCard(){
   if(!syncOn()) return Promise.resolve();
   return rpc("dawam_card_current", {}).then(c => {
@@ -1017,7 +1063,7 @@ function loadCard(){
     card = c; $("cardBtn").hidden = false;
     if(fresh && !$("cardSheet").classList.contains("open")) $("cardMus").hidden = !music.prepare(c.track, c.start, c.end);
     if(S.cardSeen !== c.id && !$("cardSheet").classList.contains("open")){
-      $("cardEnv").hidden = false; $("cardBox").hidden = true; open("cardSheet");
+      $("cardEnv").hidden = false; $("cardBox").hidden = true; open("cardSheet"); setTimeout(placeYT, 450);
     }
   }).catch(()=>{});
 }
@@ -1041,15 +1087,15 @@ function showCard(){
   $("cardWho").textContent = "— " + FROM + " · " + new Date(card.at).toLocaleString("ar-IQ",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
   renderCardReply(); open("cardSheet");
   $("cardMus").hidden = !music.prepare(card.track, card.start, card.end);
-  music.play(); petals(true);
+  music.play(); petals(true); setTimeout(placeYT, 650);
   if(S.cardSeen !== card.id){ S.cardSeen = card.id; save(); rpc("dawam_card_seen", {p_id:card.id}).catch(()=>{}); }
 }
-function closeCard(){ music.stop(false); petals(false); close("cardSheet"); }
+function closeCard(){ music.stop(false); petals(false); close("cardSheet"); music.overlay(null); }
 $("cardOpen").onclick = showCard;
 $("cardBtn").onclick = showCard;
 $("cardClose").onclick = closeCard;
 $("cardClose2").onclick = closeCard;
-$("cardMus").onclick = () => { if(music.playing()) music.stop(false); else music.play(); };
+$("cardMus").onclick = () => { if(music.playing()) music.stop(false); else music.play(); setTimeout(placeYT, 300); };
 $("cardSend").onclick = () => {
   const t = $("cardReply").value.trim(); if(!t || !card) return;
   const b = $("cardSend"); b.disabled = true; b.textContent = "جاي يندز…";

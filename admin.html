@@ -120,8 +120,9 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
       <label class="pick" id="pick" style="position:relative"><span id="pickTxt">📷 دوس هنا واختار صورة</span><input type="file" id="photo" accept="image/*"></label>
       <div class="tracks" id="tracks" role="radiogroup" aria-label="الموسيقى"></div>
       <div id="ytBox" hidden style="margin-bottom:12px">
-        <label for="ytUrl" style="display:block;font-weight:600;margin-bottom:6px">رابط يوتيوب</label>
-        <input id="ytUrl" class="field-in" inputmode="url" autocomplete="off" placeholder="https://youtu.be/…">
+        <label for="ytUrl" style="display:block;font-weight:600;margin-bottom:6px">رابط الأغنية</label>
+        <input id="ytUrl" class="field-in" inputmode="url" autocomplete="off" placeholder="https://…">
+        <div id="ytVisible" hidden style="margin-top:10px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000"></div>
       </div>
       <div id="timeBox" style="margin-bottom:12px">
         <p style="font-weight:600;margin:0 0 6px">من وين تبدي ولوين تخلص؟ <span style="font-weight:400;color:var(--muted);font-size:.85rem">(اختياري)</span></p>
@@ -273,9 +274,11 @@ function loadYT(){
   });
   return ytApi;
 }
-/* the YouTube player has to be ready before the tap, so prepare() early and play() inside the tap */
-function makeMusic(onState){
-  let kind = null, a = null, yt = null, ytReady = false, want = false, cfg = {start:0, end:0}, fadeT = null, vol = 0, key = "";
+/* Phones only let a YouTube player start with sound when the tap lands inside the player itself,
+   so the hidden player can be laid over a button (overlay) to catch that first tap. */
+function makeMusic(onState, opts){
+  opts = opts || {};
+  let kind = null, a = null, yt = null, ytReady = false, want = false, cfg = {start:0, end:0}, fadeT = null, vol = 0, key = "", ytFailed = false, over = null;
   const setVol = v => { vol = v; if(kind==="a" && a) a.volume = v; if(kind==="yt" && yt && ytReady) yt.setVolume(Math.round(v*100)); };
   function fade(to, ms, done){
     clearInterval(fadeT); const from = vol, steps = 25; let n = 0;
@@ -285,30 +288,46 @@ function makeMusic(onState){
     clearInterval(fadeT); want = false;
     if(a){ a.pause(); a.removeAttribute("src"); a = null; }
     if(yt){ try{ yt.destroy(); }catch(e){} yt = null; }
-    ytReady = false; kind = null;
+    ytReady = false; kind = null; ytFailed = false; hideOver();
   }
+  function hostEl(){
+    if(opts.hostId) return document.getElementById(opts.hostId);
+    let host = document.getElementById("ytHost");
+    if(!host){ host = document.createElement("div"); host.id = "ytHost"; host.setAttribute("aria-hidden","true"); document.body.appendChild(host); }
+    return host;
+  }
+  const HIDDEN = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;overflow:hidden;z-index:-1";
+  function placeOver(){
+    if(!over || opts.visible) return;
+    const r = over.getBoundingClientRect(), host = hostEl();
+    host.style.cssText = "position:fixed;left:"+r.left+"px;top:"+r.top+"px;width:"+r.width+"px;height:"+r.height+"px;opacity:.01;overflow:hidden;z-index:80;border-radius:999px";
+    if(yt && ytReady) try{ yt.setSize(Math.ceil(r.width), Math.ceil(r.height)); }catch(e){}
+  }
+  function hideOver(){ over = null; if(!opts.visible && document.getElementById("ytHost")) document.getElementById("ytHost").style.cssText = HIDDEN; }
+  addEventListener("resize", placeOver); addEventListener("scroll", placeOver, true);
   function prepare(track, start, end){
     const k = [track, start, end].join("|"); if(k === key && kind) return !!kind;
     teardown(); key = k; cfg = {start: +start || 0, end: +end || 0};
     if(!track) return false;
     if(track.startsWith("yt:")){
       kind = "yt";
-      let host = document.getElementById("ytHost");
-      if(!host){ host = document.createElement("div"); host.id = "ytHost"; host.setAttribute("aria-hidden","true");
-        host.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;overflow:hidden;z-index:-1";
-        document.body.appendChild(host); }
-      host.innerHTML = '<div id="ytPlayer"></div>';
+      const host = hostEl(); if(!opts.visible) host.style.cssText = HIDDEN;
+      const pid = "ytPlayer" + (opts.hostId || ""); host.innerHTML = '<div id="'+pid+'"></div>';
       loadYT().then(() => {
         if(kind !== "yt" || key !== k) return;
-        const pv = {controls:0, playsinline:1, disablekb:1, rel:0};
+        const pv = {controls: opts.visible ? 1 : 0, playsinline:1, disablekb: opts.visible ? 0 : 1, rel:0};
         if(cfg.start) pv.start = cfg.start; if(cfg.end) pv.end = cfg.end;
-        yt = new YT.Player("ytPlayer", {width:2, height:2, videoId:track.slice(3), playerVars:pv, events:{
-          onReady: () => { ytReady = true; yt.setVolume(0); if(want) startYT(); },
+        yt = new YT.Player(pid, {width: opts.visible ? "100%" : 2, height: opts.visible ? "100%" : 2, videoId:track.slice(3), playerVars:pv, events:{
+          onReady: () => { ytReady = true; if(!opts.visible) yt.setVolume(0); placeOver(); if(want) startYT(); opts.onReady && opts.onReady(); },
           onStateChange: e => {
-            if(e.data === YT.PlayerState.ENDED && want){ yt.seekTo(cfg.start, true); yt.playVideo(); }
-            if(e.data === YT.PlayerState.PLAYING) onState && onState(true);
+            if(e.data === YT.PlayerState.ENDED && (want || opts.visible)){ yt.seekTo(cfg.start, true); yt.playVideo(); }
+            if(e.data === YT.PlayerState.PLAYING){
+              if(!want){ want = true; if(!opts.visible){ vol = 0; yt.setVolume(0); fade(.7, 2500); } }
+              onState && onState(true);
+            }
+            if(e.data === YT.PlayerState.PAUSED && opts.visible){ want = false; onState && onState(false); }
           },
-          onError: () => { onState && onState(false, "yt"); }
+          onError: () => { ytFailed = true; hideOver(); onState && onState(false, "yt"); }
         }});
       });
       return true;
@@ -316,7 +335,7 @@ function makeMusic(onState){
     const list = /^https?:\/\//.test(track) ? [track] : (TRACK_SRC[track] || []);
     if(!list.length) return false;
     kind = "a"; let i = 0; const el = a = new Audio(); el.preload = "auto";
-    el.onerror = () => { if(a===el && ++i < list.length){ el.src = list[i]; if(want) startA(); } };
+    el.onerror = () => { if(a!==el) return; if(++i < list.length){ el.src = list[i]; if(want) startA(); } else { onState && onState(false, "a"); } };
     el.ontimeupdate = () => { if(cfg.end && el.currentTime >= cfg.end) el.currentTime = cfg.start; };
     el.onended = () => { if(want){ el.currentTime = cfg.start; el.play().catch(()=>{}); } };
     el.src = list[0];
@@ -329,7 +348,7 @@ function makeMusic(onState){
     setVol(0);
     el.play().then(() => { onState && onState(true); fade(.7, 2500); }).catch(() => onState && onState(false));
   }
-  function startYT(){ setVol(0); yt.playVideo(); fade(.7, 2500); }
+  function startYT(){ if(opts.visible){ yt.playVideo(); return; } setVol(0); yt.playVideo(); fade(.7, 2500); }
   return {
     prepare,
     play(){ want = true; if(kind==="a") startA(); else if(kind==="yt" && ytReady) startYT(); return !!kind; },
@@ -340,7 +359,11 @@ function makeMusic(onState){
       if(now) halt(); else fade(0, 900, halt);
     },
     playing: () => want,
-    reset: () => { teardown(); key = ""; }
+    reset: () => { teardown(); key = ""; },
+    isYT: () => kind === "yt" && !ytFailed,
+    failed: () => ytFailed,
+    /* lay the hidden YouTube player over a button so her tap starts it; null puts it away */
+    overlay(el){ if(kind !== "yt" || ytFailed || !el){ hideOver(); return; } over = el; placeOver(); }
   };
 }
 /* "1:20", "80" or "" → seconds */
@@ -356,6 +379,14 @@ function ytId(url){
   const m = url.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/) || url.match(/^([\w-]{11})$/);
   return m ? m[1] : "";
 }
+/* share links → direct file links where the site allows it (Google Drive, Dropbox) */
+function directLink(url){
+  url = String(url||"").trim();
+  let m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
+  if(m) return "https://drive.google.com/uc?export=download&id=" + m[1];
+  if(/dropbox\.com\//.test(url)) return url.replace(/([?&])dl=0/, "$1raw=1").replace(/^(?!.*[?&](raw|dl)=1)(.*)$/, (x) => x + (x.includes("?") ? "&" : "?") + "raw=1");
+  return url;
+}
 function ytStart(url){
   const m = String(url||"").match(/[?&](?:t|start)=(\d+h)?(\d+m)?(\d+)s?/);
   return m ? (parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3])) : 0;
@@ -367,16 +398,17 @@ const TRACKS = [
   {id:"debussy", name:"ديبوسي — الفتاة ذات الشعر الكتّاني", note:"ناعمة وقصيرة، مثل همسة"},
   {id:"satie", name:"ساتي — جمنوبيدي رقم 1", note:"هادية جداً، جو موراكامي بالضبط"},
   {id:"chopin27", name:"شوبان — نوكتورن Op.27 رقم 2", note:"أعمق وأطول، للبطاقات الخاصة"},
-  {id:"yt", name:"رابط يوتيوب ▶️", note:"الصق رابط أي أغنية، ويطلعلها صوتها بس"},
+  {id:"yt", name:"رابط أغنية 🔗", note:"يوتيوب، أو رابط mp3، أو Google Drive / Dropbox. يطلعلها الصوت بس"},
   {id:"", name:"بدون موسيقى", note:""}
 ];
 const KEY_LS = "dawam-card-key";
 let cardKey = "", photoData = "", track = "chopin";
 const preview = makeMusic((on, err) => {
   document.querySelectorAll(".play").forEach(b => b.textContent = "▶");
-  if(on){ const b = document.querySelector(".trk.on .play"); if(b) b.textContent = "⏸"; }
-  if(err === "yt") $("cState").textContent = "هذا الفيديو صاحبه ما يسمح يشتغل برا يوتيوب، جرب رابط ثاني";
-});
+  if(on){ const b = document.querySelector(".trk.on .play"); if(b) b.textContent = "⏸"; $("cState").textContent = ""; }
+  if(err === "yt") $("cState").textContent = "هذا الفيديو صاحبه مانع يشتغل برا يوتيوب. جرب رابط ثاني لنفس الأغنية (نسخة lyrics أو بيانو).";
+  if(err === "a" && track === "yt") $("cState").textContent = "هذا الرابط ما يشتغل كصوت. لازم يكون رابط يوتيوب، أو رابط مباشر للأغنية (ينتهي بـ mp3)، أو ملف بـ Google Drive مشارك «لأي شخص عنده الرابط».";
+}, {hostId:"ytVisible", visible:true});
 try{
   const m = location.hash.match(/k=([\w-]{16,})/);
   if(m){ localStorage.setItem(KEY_LS, m[1]); history.replaceState(null, "", location.pathname); }
@@ -389,7 +421,10 @@ $("keySave").onclick = () => { cardKey = $("keyIn").value.trim(); try{ localStor
 function chosen(){
   const st = toSec($("tStart").value), en = toSec($("tEnd").value);
   let t = track;
-  if(track === "yt"){ const id = ytId($("ytUrl").value); t = id ? "yt:"+id : ""; }
+  if(track === "yt"){
+    const u = $("ytUrl").value.trim(), id = ytId(u);
+    t = id ? "yt:"+id : /^https?:\/\/\S+$/i.test(u) ? directLink(u) : "";
+  }
   return {track:t, start:st, end:en};
 }
 function timesOk(c){
@@ -415,23 +450,25 @@ function renderTracks(){
         if(track !== t.id){ track = t.id; renderTracks(); }
         if(preview.playing()){ preview.stop(true); return; }
         const c = chosen(); if(!timesOk(c)) return;
-        if(!c.track){ $("cState").textContent = "الصق رابط يوتيوب أول"; return; }
+        if(!c.track){ $("cState").textContent = "الصق رابط الأغنية أول"; return; }
         preview.prepare(c.track, c.start, c.end);
         preview.play();
-        if(c.track.startsWith("yt:")) $("cState").textContent = "إذا ما اشتغل، دوس ▶ مرة ثانية بعد ثانية";
+        if(c.track.startsWith("yt:")) $("cState").textContent = "إذا ما اشتغل، دوس على الفيديو اللي تحت الرابط";
       };
       row.appendChild(pb);
     }
     box.appendChild(row);
   });
   $("ytBox").hidden = track !== "yt";
+  $("ytVisible").hidden = !(track === "yt" && ytId($("ytUrl").value));
   $("timeBox").hidden = !track;
 }
 $("ytUrl").addEventListener("change", () => {
-  const u = $("ytUrl").value;
-  if(u && !ytId(u)){ $("cState").textContent = "هذا مو رابط يوتيوب صحيح"; return; }
+  const u = $("ytUrl").value.trim();
+  if(u && !ytId(u) && !/^https?:\/\/\S+$/i.test(u)){ $("cState").textContent = "الصق رابط كامل يبدي بـ https://"; return; }
   $("cState").textContent = "";
-  const st = ytStart(u); if(st && !$("tStart").value) $("tStart").value = fmtSec(st);
+  const st = ytId(u) ? ytStart(u) : 0; if(st && !$("tStart").value) $("tStart").value = fmtSec(st);
+  $("ytVisible").hidden = !ytId(u);
   preview.stop(true); prep();
 });
 ["tStart","tEnd"].forEach(id => $(id).addEventListener("change", () => { preview.stop(true); prep(); }));
@@ -463,7 +500,7 @@ $("cardSend").onclick = () => {
   const cap = $("cap").value.trim(), c = chosen();
   if(!photoData){ $("cState").textContent = "اختار صورة أول"; return; }
   if(!cap){ $("cState").textContent = "اكتبلها شي ويا الصورة"; return; }
-  if(track === "yt" && !c.track){ $("cState").textContent = "الصق رابط يوتيوب صحيح أو اختار مقطوعة ثانية"; return; }
+  if(track === "yt" && !c.track){ $("cState").textContent = "الصق رابط الأغنية أو اختار مقطوعة ثانية"; return; }
   if(!timesOk(c)) return;
   $("cardSend").disabled = true; $("cState").textContent = "جاي يندز…"; preview.stop(true);
   rest("rpc/dawam_card_add", {method:"POST", body:JSON.stringify({p_key:cardKey, p_photo:photoData, p_caption:cap, p_track:c.track, p_start:c.start||null, p_end:c.end||null})})
@@ -478,7 +515,7 @@ $("cardSend").onclick = () => {
 };
 function trackLabel(c){
   const t = c.track || "";
-  const name = t.startsWith("yt:") ? "يوتيوب" : (TRACKS.find(x => x.id === t) || {name:"بدون موسيقى"}).name;
+  const name = t.startsWith("yt:") ? "يوتيوب" : /^https?:/.test(t) ? "رابط أغنية" : (TRACKS.find(x => x.id === t) || {name:"بدون موسيقى"}).name;
   const range = c.start || c.end ? " · " + (fmtSec(c.start) || "0:00") + (c.end ? " ← " + fmtSec(c.end) : "") : "";
   return (t ? "🎹 " : "") + name + range;
 }
