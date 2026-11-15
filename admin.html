@@ -72,6 +72,26 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
 .reply-box{margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--rose-soft);font-size:.95rem;white-space:pre-line}
 .reply-box b{display:block;font-size:.78rem;font-weight:600;color:var(--rose);margin-bottom:2px}
 .seen-at{margin:10px 0 0;font-size:.78rem;color:var(--muted)}
+/* photo card */
+.pc{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:22px}
+.pc h2{margin:0 0 4px}
+.pc .lead{margin:0 0 12px}
+.pick{display:flex;align-items:center;justify-content:center;min-height:140px;border:1.5px dashed var(--line);border-radius:16px;background:var(--bg);color:var(--muted);cursor:pointer;overflow:hidden;text-align:center;padding:8px}
+.pick img{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:12px}
+.pick input{position:absolute;opacity:0;width:1px;height:1px}
+.tracks{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.trk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:14px;background:var(--bg)}
+.trk.on{border-color:var(--rose);background:var(--rose-soft)}
+.trk label{flex:1;cursor:pointer}
+.trk label b{display:block;font-weight:600;font-size:.95rem}
+.trk label span{font-size:.8rem;color:var(--muted)}
+.trk input{accent-color:var(--rose);width:20px;height:20px}
+.play{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface)}
+.pc textarea{min-height:90px}
+.key{display:flex;gap:8px;margin-top:8px}
+.key input{flex:1;min-height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;padding:0 12px}
+.key button{width:auto;margin:0;padding:0 16px}
+.cards .msg p b{display:block;font-weight:600;font-size:.8rem;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -85,6 +105,25 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
     <p class="lsub" id="lSub"></p>
     <div class="bar"><b id="lBar"></b></div>
     <p class="seen-at" id="lSeen"></p>
+  </section>
+
+  <section class="pc" aria-labelledby="pcT">
+    <h2 id="pcT">بطاقة بصورة وموسيقى 💌</h2>
+    <p class="lead">تطلعلها أول ما تفتح دوامي: صورتك، وموسيقى بيانو، وكلامك. وتكدر ترد عليك إذا حبت.</p>
+    <div id="keyBox" hidden>
+      <p class="lead" style="margin:0">حتى محد غيرك يكدر يدز بطاقات، الصق مفتاح البطاقات مرة وحدة:</p>
+      <div class="key"><input id="keyIn" autocomplete="off" placeholder="مفتاح البطاقات"><button class="btn" id="keySave">حفظ</button></div>
+    </div>
+    <div id="cardForm">
+      <label class="pick" id="pick" style="position:relative"><span id="pickTxt">📷 دوس هنا واختار صورة</span><input type="file" id="photo" accept="image/*"></label>
+      <div class="tracks" id="tracks" role="radiogroup" aria-label="الموسيقى"></div>
+      <label for="cap" style="display:block;font-weight:600;margin-bottom:6px">شنو تكتبلها؟</label>
+      <textarea id="cap" maxlength="1000" placeholder="مثلاً: تذكرين هاي الصورة؟ من يومها وأنا أحبج أكثر…"></textarea>
+      <button class="btn" id="cardSend">دز البطاقة 💌</button>
+      <p class="state" id="cState" role="status"></p>
+    </div>
+    <h2>البطاقات اللي دزيتها</h2>
+    <div class="list cards" id="cardList"></div>
   </section>
 
   <label for="body" style="display:block;font-weight:600;margin-bottom:6px">رسالة جديدة</label>
@@ -200,6 +239,109 @@ function loadHer(){
     .then(d => { if(d) { her = d; renderLive(); } else { $("lChip").textContent = "بعد ماكو بيانات"; } })
     .catch(() => { $("lSub").textContent = "ما گدرت أجيب حالتها، تأكد من الإنترنت"; });
 }
+
+/* ===== Photo card with piano music ===== */
+const TRACKS = [
+  {id:"chopin", name:"شوبان — نوكتورن Op.9 رقم 2", note:"الأشهر والأكثر رومانسية، دافي وحالم",
+   src:["https://upload.wikimedia.org/wikipedia/commons/transcoded/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg.mp3","https://upload.wikimedia.org/wikipedia/commons/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg"]},
+  {id:"debussy", name:"ديبوسي — الفتاة ذات الشعر الكتّاني", note:"ناعمة وقصيرة، مثل همسة",
+   src:["https://upload.wikimedia.org/wikipedia/commons/transcoded/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg.mp3","https://upload.wikimedia.org/wikipedia/commons/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg"]},
+  {id:"satie", name:"ساتي — جمنوبيدي رقم 1", note:"هادية جداً، جو موراكامي بالضبط",
+   src:["https://upload.wikimedia.org/wikipedia/commons/2/2a/Gymnopedie_No._1_(ISRC_USUAN1100787).mp3"]},
+  {id:"chopin27", name:"شوبان — نوكتورن Op.27 رقم 2", note:"أعمق وأطول، للبطاقات الخاصة",
+   src:["https://upload.wikimedia.org/wikipedia/commons/transcoded/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg.mp3","https://upload.wikimedia.org/wikipedia/commons/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg"]},
+  {id:"", name:"بدون موسيقى", note:"", src:[]}
+];
+const KEY_LS = "dawam-card-key";
+let cardKey = "", photoData = "", track = "chopin", preview = null, previewId = null;
+try{
+  const m = location.hash.match(/k=([\w-]{16,})/);
+  if(m){ localStorage.setItem(KEY_LS, m[1]); history.replaceState(null, "", location.pathname); }
+  cardKey = localStorage.getItem(KEY_LS) || "";
+}catch(e){}
+function keyUI(){ $("keyBox").hidden = !!cardKey; $("cardForm").hidden = !cardKey; }
+$("keySave").onclick = () => { cardKey = $("keyIn").value.trim(); try{ localStorage.setItem(KEY_LS, cardKey); }catch(e){} keyUI(); loadCards(); };
+
+function stopPreview(){ if(preview){ preview.pause(); preview = null; } previewId = null; document.querySelectorAll(".play").forEach(b => b.textContent = "▶"); }
+function playPreview(t, btn){
+  if(previewId === t.id){ stopPreview(); return; }
+  stopPreview(); let i = 0; const a = preview = new Audio(t.src[0]); previewId = t.id;
+  a.onerror = () => { if(preview===a && ++i < t.src.length){ a.src = t.src[i]; a.play().catch(()=>{}); } };
+  a.play().then(() => btn.textContent = "⏸").catch(() => { $("cState").textContent = "ما اشتغلت الموسيقى، جرب مرة ثانية"; });
+}
+function renderTracks(){
+  const box = $("tracks"); box.innerHTML = "";
+  TRACKS.forEach(t => {
+    const row = document.createElement("div"); row.className = "trk" + (track===t.id ? " on" : "");
+    const r = document.createElement("input"); r.type = "radio"; r.name = "trk"; r.id = "trk-"+(t.id||"none"); r.checked = track===t.id;
+    r.onchange = () => { track = t.id; renderTracks(); };
+    const l = document.createElement("label"); l.htmlFor = r.id;
+    const b = document.createElement("b"); b.textContent = t.name; l.appendChild(b);
+    if(t.note){ const sp = document.createElement("span"); sp.textContent = t.note; l.appendChild(sp); }
+    row.append(r, l);
+    if(t.src.length){ const pb = document.createElement("button"); pb.type = "button"; pb.className = "play"; pb.textContent = previewId===t.id ? "⏸" : "▶"; pb.setAttribute("aria-label","اسمع "+t.name); pb.onclick = () => playPreview(t, pb); row.appendChild(pb); }
+    box.appendChild(row);
+  });
+}
+function shrink(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const max = 1280, k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      let q = .85, out = c.toDataURL("image/jpeg", q);
+      while(out.length > 1400000 && q > .4){ q -= .1; out = c.toDataURL("image/jpeg", q); }
+      res(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(); };
+    img.src = url;
+  });
+}
+$("photo").onchange = e => {
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  $("pickTxt").textContent = "لحظة…";
+  shrink(f).then(d => {
+    photoData = d; const pick = $("pick"); pick.querySelector("img")?.remove();
+    const im = document.createElement("img"); im.src = d; im.alt = "الصورة المختارة";
+    $("pickTxt").hidden = true; pick.insertBefore(im, $("photo"));
+  }).catch(() => { $("pickTxt").textContent = "ما گدرت أفتح الصورة، اختار وحدة ثانية"; });
+};
+$("cardSend").onclick = () => {
+  const cap = $("cap").value.trim();
+  if(!photoData){ $("cState").textContent = "اختار صورة أول"; return; }
+  if(!cap){ $("cState").textContent = "اكتبلها شي ويا الصورة"; return; }
+  $("cardSend").disabled = true; $("cState").textContent = "جاي يندز…"; stopPreview();
+  rest("rpc/dawam_card_add", {method:"POST", body:JSON.stringify({p_key:cardKey, p_photo:photoData, p_caption:cap, p_track:track})})
+    .then(() => {
+      $("cState").textContent = "وصلت 💌 راح تطلعلها أول ما تفتح دوامي";
+      $("cap").value = ""; photoData = ""; $("pick").querySelector("img")?.remove();
+      $("pickTxt").hidden = false; $("pickTxt").textContent = "📷 دوس هنا واختار صورة"; $("photo").value = "";
+      return loadCards();
+    })
+    .catch(e => { $("cState").textContent = String(e.message).startsWith("4") ? "المفتاح غلط أو الصورة كبيرة" : "ما وصلت، جرب مرة ثانية"; })
+    .finally(() => $("cardSend").disabled = false);
+};
+const trackName = id => (TRACKS.find(t => t.id === (id||"")) || {name:""}).name;
+function loadCards(){
+  if(!cardKey) { $("cardList").innerHTML = ""; return Promise.resolve(); }
+  return rest("rpc/dawam_card_list", {method:"POST", body:JSON.stringify({p_key:cardKey})}).then(rows => {
+    const box = $("cardList"); box.innerHTML = "";
+    if(!rows || !rows.length){ const e = document.createElement("p"); e.className = "empty"; e.textContent = "بعد ما دزيت بطاقة."; box.appendChild(e); return; }
+    rows.forEach((c, i) => {
+      const row = document.createElement("div"); row.className = "msg" + (c.seen ? " seen" : "");
+      const p = document.createElement("p");
+      const tag = document.createElement("b"); tag.textContent = (i===0 ? "الحالية · " : "") + "🎹 " + trackName(c.track); p.appendChild(tag);
+      p.appendChild(document.createTextNode(c.caption));
+      const s = document.createElement("small"); s.textContent = c.seen ? "👀 شافتها " + when(c.seen) : "انبعثت " + when(c.at) + " · بعدها ما شافتها"; p.appendChild(s);
+      if(c.reply){ const r = document.createElement("div"); r.className = "reply-box"; const h = document.createElement("b"); h.textContent = "ردها · " + when(c.replied); r.append(h, document.createTextNode(c.reply)); p.appendChild(r); }
+      const d = document.createElement("button"); d.className = "del"; d.innerHTML = TRASH; d.setAttribute("aria-label","امسح البطاقة");
+      d.onclick = () => { if(confirm("تمسح هاي البطاقة؟")) rest("rpc/dawam_card_delete", {method:"POST", body:JSON.stringify({p_key:cardKey, p_id:c.id})}).then(loadCards).catch(()=> $("cState").textContent = "ما انمسحت، جرب مرة ثانية"); };
+      row.append(p, d); box.appendChild(row);
+    });
+  }).catch(() => { $("cardList").innerHTML = '<p class="empty">ما گدرت أجيب البطاقات، تأكد من المفتاح والإنترنت.</p>'; });
+}
+keyUI(); renderTracks(); loadCards(); setInterval(loadCards, 30000);
 
 document.addEventListener("visibilitychange", () => { if(!document.hidden){ load(); loadHer(); } });
 load(); loadHer();

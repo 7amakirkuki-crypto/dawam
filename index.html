@@ -161,6 +161,33 @@ textarea:focus-visible{outline:3px solid var(--rose);outline-offset:2px}
 .stepper .val span{font-size:.85rem;color:var(--muted)}
 .sheet .sec{font-size:.95rem;font-weight:600;margin:4px 0 6px}
 canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
+.icon-btn[hidden]{display:none}
+#cardBtn{font-size:1.2rem}
+/* ===== Photo card from Hama ===== */
+#cardSheet{align-items:center;z-index:65;background:rgba(20,8,18,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.env{text-align:center;color:#fff;animation:up .4s ease;padding:20px}
+.env .seal{width:120px;height:120px;margin:0 auto 18px;border-radius:50%;background:linear-gradient(145deg,#F06C92,#D3426B);display:grid;place-items:center;font-size:3.2rem;box-shadow:0 12px 40px rgba(211,66,107,.55);animation:beat 1.6s ease-in-out infinite}
+.env h3{margin:0 0 6px;font-size:1.35rem;font-weight:600}
+.env p{margin:0 0 22px;opacity:.85}
+.env .btn{min-width:210px;flex:none;background:#fff;color:#D3426B}
+.pcard{background:var(--surface);width:calc(100% - 32px);max-width:420px;max-height:calc(100vh - 40px);overflow:auto;border-radius:28px;animation:unfold .6s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes unfold{from{transform:scale(.7) rotate(-4deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.1)}30%{transform:scale(1)}45%{transform:scale(1.06)}}
+.pcard .ph{position:relative}
+.pcard img{display:block;width:100%;max-height:56vh;object-fit:cover;border-radius:28px 28px 0 0}
+.pcard .mus{position:absolute;top:12px;inset-inline-start:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:1.15rem;display:grid;place-items:center}
+.pcard .mus[hidden]{display:none}
+.pcard .mus.on{animation:spin 4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pcard .body{padding:18px 20px 20px;text-align:center}
+.pcard .cap{font-size:1.2rem;line-height:1.85;white-space:pre-line;overflow-wrap:anywhere;margin:0}
+.pcard .who{display:block;color:var(--muted);font-size:.85rem;margin:6px 0 14px}
+.pcard textarea{display:block;width:100%;min-height:84px;border-radius:16px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:1rem;padding:12px 14px;resize:vertical}
+.pcard .rep{background:var(--rose-soft);border-radius:16px;padding:12px 14px;text-align:start;white-space:pre-line;overflow-wrap:anywhere;margin:0}
+.pcard .rep small{display:block;color:var(--muted);font-size:.8rem;margin-bottom:2px}
+.pcard .row2{display:flex;gap:10px;margin-top:10px}
+.petal{position:fixed;top:-30px;z-index:66;pointer-events:none;color:#F06C92;opacity:.85;animation:fall linear forwards}
+@keyframes fall{to{transform:translate(var(--dx),110vh) rotate(540deg);opacity:.15}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -172,9 +199,12 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
       <p class="hello" id="hello">أهلاً</p>
       <p class="date" id="today"></p>
     </div>
+    <div style="display:flex;gap:8px">
+    <button class="icon-btn" id="cardBtn" hidden aria-label="بطاقة حمه">💌</button>
     <button class="icon-btn" id="openSettings" aria-label="الإعدادات">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
+    </div>
   </header>
 
   <div class="hero" aria-live="polite">
@@ -227,6 +257,37 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
     </div>
     <p class="small-msg">اضغطي على أي يوم حتى تضيفين أو تعدلين ساعاته.</p>
   </section>
+</div>
+
+<!-- Photo card from Hama -->
+<div class="scrim" id="cardSheet" role="dialog" aria-modal="true" aria-label="بطاقة من حمه">
+  <div class="env" id="cardEnv">
+    <div class="seal">💌</div>
+    <h3>عندج بطاقة من حمه</h3>
+    <p>شغّلي الصوت، وافتحيها على راحتج</p>
+    <button class="btn" id="cardOpen">افتحي البطاقة</button>
+  </div>
+  <div class="pcard" id="cardBox" hidden>
+    <div class="ph">
+      <img id="cardImg" alt="صورة من حمه">
+      <button class="mus" id="cardMus" aria-label="شغّلي أو وقّفي الموسيقى">♪</button>
+    </div>
+    <div class="body">
+      <p class="cap" id="cardCap"></p>
+      <span class="who" id="cardWho"></span>
+      <div id="cardReplyBox">
+        <textarea id="cardReply" maxlength="1000" placeholder="إذا حبيتي، اكتبيله رد هنا…"></textarea>
+        <div class="row2">
+          <button class="btn primary" id="cardSend">دزّي الرد 🤍</button>
+          <button class="btn ghost" id="cardClose">سكّري</button>
+        </div>
+      </div>
+      <div id="cardDone" hidden>
+        <p class="rep"><small>ردج</small><span id="cardRepTxt"></span></p>
+        <button class="btn ghost" style="width:100%;margin-top:10px" id="cardClose2">سكّري</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Start sheet -->
@@ -732,6 +793,7 @@ function render(){ renderHero(); renderActions(); renderMonth(); renderMemo(); }
 function open(id){ $(id).classList.add("open"); }
 function close(id){ $(id).classList.remove("open"); }
 document.querySelectorAll(".scrim").forEach(s=>{
+  if(s.id==="cardSheet") return;
   s.addEventListener("click", e=>{ if(e.target===s || e.target.hasAttribute("data-close")) s.classList.remove("open"); });
 });
 document.querySelectorAll("#breakSheet .choice").forEach(b=> b.onclick = ()=>{ close("breakSheet"); startBreak(+b.dataset.min); });
@@ -837,6 +899,82 @@ function cancelOff(){
   delete S.days[dkey(new Date())]; save(); lastMode = "x"; render();
 }
 
+/* ===== Photo card from Hama (admin.html): photo, piano, caption, her reply ===== */
+const WM = "https://upload.wikimedia.org/wikipedia/commons/";
+const TRACKS = {
+  chopin: [WM+"transcoded/5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg.mp3", WM+"5/5c/Frederic_Chopin_-_Nocturne_Eb_major_Opus_9,_number_2.ogg"],
+  satie: [WM+"2/2a/Gymnopedie_No._1_(ISRC_USUAN1100787).mp3"],
+  debussy: [WM+"transcoded/8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg.mp3", WM+"8/8d/Claude_Debussy_-_I_Livre_Prelude_VIII..._(...La_fille_aux_cheveux_de_lin)_-_Patrizia_Prati.ogg"],
+  chopin27: [WM+"transcoded/4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg.mp3", WM+"4/42/Fryderyk_Chopin_-_Nocturne_op._27_n.2_Des-dur_-_Patrizia_Prati.ogg"]
+};
+let card = null, audio = null, fadeT = null, petalT = null;
+function loadCard(){
+  if(!syncOn()) return Promise.resolve();
+  return rpc("dawam_card_current", {}).then(c => {
+    if(!c || !c.id){ card = null; $("cardBtn").hidden = true; return; }
+    card = c; $("cardBtn").hidden = false;
+    if(S.cardSeen !== c.id && !$("cardSheet").classList.contains("open")){
+      $("cardEnv").hidden = false; $("cardBox").hidden = true; open("cardSheet");
+    }
+  }).catch(()=>{});
+}
+const trackSrcs = t => !t ? [] : /^https?:\/\//.test(t) ? [t] : (TRACKS[t] || []);
+function fadeTo(target, ms, done){
+  clearInterval(fadeT); if(!audio){ done && done(); return; }
+  const a = audio, from = a.volume, steps = 25; let n = 0;
+  fadeT = setInterval(()=>{ n++; a.volume = Math.max(0, Math.min(1, from + (target-from)*n/steps)); if(n>=steps){ clearInterval(fadeT); done && done(); } }, ms/steps);
+}
+function stopMusic(now){
+  $("cardMus").classList.remove("on");
+  if(!audio) return; const a = audio;
+  if(now){ clearInterval(fadeT); a.pause(); audio = null; return; }
+  fadeTo(0, 900, ()=>{ a.pause(); if(audio===a) audio = null; });
+}
+function playMusic(){
+  stopMusic(true);
+  const list = trackSrcs(card && card.track);
+  $("cardMus").hidden = !list.length; if(!list.length) return;
+  let i = 0; const a = audio = new Audio(); a.loop = true; a.volume = 0;
+  const go = () => a.play().then(()=>{ $("cardMus").classList.add("on"); fadeTo(0.7, 2500); }).catch(()=>{});
+  a.onerror = () => { if(audio===a && ++i < list.length){ a.src = list[i]; go(); } };
+  a.src = list[0]; go();
+}
+function petals(on){
+  clearInterval(petalT); if(!on || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const drop = () => { const p = document.createElement("span"); p.className = "petal"; p.textContent = Math.random()<.5 ? "♥" : "❀";
+    p.style.left = (Math.random()*100)+"vw"; p.style.fontSize = (12+Math.random()*14)+"px"; p.style.setProperty("--dx", ((Math.random()-.5)*120)+"px");
+    p.style.animationDuration = (6+Math.random()*5)+"s"; document.body.appendChild(p); setTimeout(()=>p.remove(), 11500); };
+  for(let i=0;i<6;i++) setTimeout(drop, i*300);
+  petalT = setInterval(drop, 900);
+}
+function renderCardReply(){
+  const has = !!(card && card.reply);
+  $("cardReplyBox").hidden = has; $("cardDone").hidden = !has;
+  if(has) $("cardRepTxt").textContent = card.reply;
+}
+function showCard(){
+  if(!card) return;
+  $("cardEnv").hidden = true; $("cardBox").hidden = false;
+  $("cardImg").src = card.photo; $("cardCap").textContent = card.caption;
+  $("cardWho").textContent = "— " + FROM + " · " + new Date(card.at).toLocaleString("ar-IQ",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
+  renderCardReply(); open("cardSheet"); playMusic(); petals(true);
+  if(S.cardSeen !== card.id){ S.cardSeen = card.id; save(); rpc("dawam_card_seen", {p_id:card.id}).catch(()=>{}); }
+}
+function closeCard(){ stopMusic(false); petals(false); close("cardSheet"); }
+$("cardOpen").onclick = showCard;
+$("cardBtn").onclick = showCard;
+$("cardClose").onclick = closeCard;
+$("cardClose2").onclick = closeCard;
+$("cardMus").onclick = () => { if(audio && !audio.paused) stopMusic(false); else playMusic(); };
+$("cardSend").onclick = () => {
+  const t = $("cardReply").value.trim(); if(!t || !card) return;
+  const b = $("cardSend"); b.disabled = true; b.textContent = "جاي يندز…";
+  rpc("dawam_card_reply", {p_id:card.id, p_reply:t})
+    .then(() => { card.reply = t; $("cardReply").value = ""; renderCardReply(); confetti(); if(navigator.vibrate) navigator.vibrate(20); })
+    .catch(() => alert("ما وصل الرد، جربي مرة ثانية"))
+    .finally(() => { b.disabled = false; b.textContent = "دزّي الرد 🤍"; });
+};
+
 /* ===== Confetti for a full day ===== */
 function confetti(){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -852,13 +990,13 @@ function confetti(){
 
 /* ===== Loop ===== */
 document.addEventListener("visibilitychange", ()=>{
-  if(document.hidden){ if(pushTimer) push(true); return; }
+  if(document.hidden){ if(pushTimer) push(true); if(audio) stopMusic(true); return; }
   pull().then(()=>{ check(); render(); syncWake(); });
-  loadLoves();
+  loadLoves(); loadCard();
 });
 render(); renderNote(false); check(); syncWake();
 pull().then(()=>{ check(); render(); });
-loadLoves(); setInterval(loadLoves, 120000);
+loadLoves(); loadCard(); setInterval(loadLoves, 120000);
 setInterval(()=>{ check(); renderHero(); renderActions(); }, 1000);
 setInterval(renderMonth, 30000);
 </script>

@@ -71,3 +71,22 @@ create policy "dawam messages open insert" on public.dawam_messages for insert t
 create policy "dawam messages open update" on public.dawam_messages for update to anon using (true) with check (true);
 create policy "dawam messages open delete" on public.dawam_messages for delete to anon using (true);
 grant select, insert, update, delete on public.dawam_messages to anon;
+
+-- photo cards from admin.html: photo + piano track + caption, shown to her when she opens the app; she can reply.
+-- Writing, listing and deleting need the card key (kept in dawam_secret, typed once into admin.html; not stored in this repo).
+create table if not exists public.dawam_cards (
+  id bigint generated always as identity primary key,
+  photo text not null check (length(photo) between 100 and 2000000),
+  caption text not null check (length(caption) between 1 and 1000),
+  track text,
+  created_at timestamptz not null default now(),
+  seen_at timestamptz,
+  reply text check (reply is null or length(reply) between 1 and 1000),
+  replied_at timestamptz
+);
+alter table public.dawam_cards enable row level security;
+create table if not exists public.dawam_secret (id int primary key check (id=1), key text not null);
+alter table public.dawam_secret enable row level security;
+-- functions: dawam_card_current(), dawam_card_seen(id), dawam_card_reply(id, text),
+--            dawam_card_add(key, photo, caption, track), dawam_card_list(key), dawam_card_delete(key, id)
+-- (applied as migration "dawam_cards" on the Supabase project)
