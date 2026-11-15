@@ -92,3 +92,6 @@ alter table public.dawam_secret enable row level security;
 -- track: chopin / debussy / satie / chopin27, or "yt:VIDEOID" for a YouTube link (sound only); track_start / track_end in seconds
 -- (migration "dawam_cards_music_timing")
 -- (applied as migration "dawam_cards" on the Supabase project)
+
+-- song files Hama uploads from admin.html (public bucket, 25 MB, audio only; anyone may upload, nobody may overwrite or delete)
+-- bucket "dawam-audio" + policies "dawam audio upload" (insert) and "dawam audio read" (select) — migration "dawam_audio_bucket"

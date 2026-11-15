@@ -122,6 +122,7 @@ h2{font-size:1rem;font-weight:600;margin:26px 0 8px}
       <div id="ytBox" hidden style="margin-bottom:12px">
         <label for="ytUrl" style="display:block;font-weight:600;margin-bottom:6px">رابط الأغنية</label>
         <input id="ytUrl" class="field-in" inputmode="url" autocomplete="off" placeholder="https://…">
+        <label class="pick" id="upPick" style="position:relative;min-height:56px;margin-top:8px"><span id="upTxt">📁 أو ارفع الأغنية من موبايلك (mp3 أو m4a)</span><input type="file" id="upFile" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.opus"></label>
         <div id="ytVisible" hidden style="margin-top:10px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000"></div>
       </div>
       <div id="timeBox" style="margin-bottom:12px">
@@ -398,7 +399,7 @@ const TRACKS = [
   {id:"debussy", name:"ديبوسي — الفتاة ذات الشعر الكتّاني", note:"ناعمة وقصيرة، مثل همسة"},
   {id:"satie", name:"ساتي — جمنوبيدي رقم 1", note:"هادية جداً، جو موراكامي بالضبط"},
   {id:"chopin27", name:"شوبان — نوكتورن Op.27 رقم 2", note:"أعمق وأطول، للبطاقات الخاصة"},
-  {id:"yt", name:"رابط أغنية 🔗", note:"يوتيوب، أو رابط mp3، أو Google Drive / Dropbox. يطلعلها الصوت بس"},
+  {id:"yt", name:"رابط أغنية 🔗 أو ملف", note:"الصق أي رابط، أو ارفع الأغنية من موبايلك. يطلعلها الصوت بس"},
   {id:"", name:"بدون موسيقى", note:""}
 ];
 const KEY_LS = "dawam-card-key";
@@ -407,7 +408,7 @@ const preview = makeMusic((on, err) => {
   document.querySelectorAll(".play").forEach(b => b.textContent = "▶");
   if(on){ const b = document.querySelector(".trk.on .play"); if(b) b.textContent = "⏸"; $("cState").textContent = ""; }
   if(err === "yt") $("cState").textContent = "هذا الفيديو صاحبه مانع يشتغل برا يوتيوب. جرب رابط ثاني لنفس الأغنية (نسخة lyrics أو بيانو).";
-  if(err === "a" && track === "yt") $("cState").textContent = "هذا الرابط ما يشتغل كصوت. لازم يكون رابط يوتيوب، أو رابط مباشر للأغنية (ينتهي بـ mp3)، أو ملف بـ Google Drive مشارك «لأي شخص عنده الرابط».";
+  if(err === "a" && track === "yt") $("cState").textContent = linkHelp($("ytUrl").value);
 }, {hostId:"ytVisible", visible:true});
 try{
   const m = location.hash.match(/k=([\w-]{16,})/);
@@ -417,6 +418,33 @@ try{
 function keyUI(){ $("keyBox").hidden = !!cardKey; $("cardForm").hidden = !cardKey; }
 $("keySave").onclick = () => { cardKey = $("keyIn").value.trim(); try{ localStorage.setItem(KEY_LS, cardKey); }catch(e){} keyUI(); loadCards(); };
 
+/* sites that never hand out the song itself: say so plainly instead of failing quietly */
+const CLOSED = [[/spotify\.com/,"سبوتيفاي"],[/anghami\.com/,"أنغامي"],[/tiktok\.com/,"تيك توك"],[/instagram\.com/,"إنستغرام"],[/facebook\.com|fb\.watch/,"فيسبوك"],[/soundcloud\.com|on\.soundcloud/,"ساوند كلاود"],[/music\.apple\.com/,"آبل ميوزك"],[/deezer\.com/,"ديزر"]];
+function closedSite(u){ const m = CLOSED.find(c => c[0].test(u)); return m ? m[1] : ""; }
+function linkHelp(u){
+  const site = closedSite(u);
+  return site ? site + " ما يسمح ياخذ صوت الأغنية منه لأي موقع ثاني. دوّر نفس الأغنية بيوتيوب والصق رابطها، أو نزّلها وارفعها من زر 📁."
+              : "هذا الرابط ما يشتغل كصوت. جرب رابط يوتيوب للأغنية، أو نزّلها وارفعها من زر 📁.";
+}
+/* upload a song file to Supabase storage, then use its link like any other */
+$("upFile").onchange = e => {
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  if(f.size > 25*1024*1024){ $("cState").textContent = "الملف أكبر من 25 ميغا، اختار نسخة أصغر"; return; }
+  const ext = ((f.name.match(/\.([a-z0-9]+)$/i) || [,"mp3"])[1]).toLowerCase();
+  const okExt = ["mp3","m4a","aac","ogg","wav","mp4","opus","webm"].includes(ext) ? ext : "mp3";
+  const name = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,8) + "." + okExt;
+  $("upTxt").textContent = "جاي يرفع الأغنية… لا تسكر الصفحة"; $("cardSend").disabled = true;
+  fetch(SUPABASE_URL + "/storage/v1/object/dawam-audio/" + name, {method:"POST", body:f,
+    headers:{apikey:SUPABASE_KEY, "Content-Type": f.type || "audio/mpeg", "x-upsert":"false"}})
+    .then(r => { if(!r.ok) throw new Error(r.status); })
+    .then(() => {
+      $("ytUrl").value = SUPABASE_URL + "/storage/v1/object/public/dawam-audio/" + name;
+      $("upTxt").textContent = "✅ انرفعت: " + f.name;
+      $("ytUrl").dispatchEvent(new Event("change"));
+    })
+    .catch(() => { $("upTxt").textContent = "📁 ما انرفعت، جرب مرة ثانية"; })
+    .finally(() => { $("cardSend").disabled = false; e.target.value = ""; });
+};
 /* what will be saved: track id ("yt:ID" for YouTube) and the times */
 function chosen(){
   const st = toSec($("tStart").value), en = toSec($("tEnd").value);
@@ -466,7 +494,7 @@ function renderTracks(){
 $("ytUrl").addEventListener("change", () => {
   const u = $("ytUrl").value.trim();
   if(u && !ytId(u) && !/^https?:\/\/\S+$/i.test(u)){ $("cState").textContent = "الصق رابط كامل يبدي بـ https://"; return; }
-  $("cState").textContent = "";
+  $("cState").textContent = closedSite(u) ? linkHelp(u) : "";
   const st = ytId(u) ? ytStart(u) : 0; if(st && !$("tStart").value) $("tStart").value = fmtSec(st);
   $("ytVisible").hidden = !ytId(u);
   preview.stop(true); prep();
